@@ -44,6 +44,7 @@ class Fornecedor(Base):
     __tablename__ = "fornecedores"
     
     id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, unique=True, index=True)  # FOR-0001, FOR-0002...
     nome = Column(String, nullable=False, index=True)
     razao_social = Column(String)
     cnpj = Column(String, unique=True, index=True)
@@ -259,6 +260,7 @@ class Cliente(Base):
     __tablename__ = "clientes"
     
     id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, unique=True, index=True)  # CLI-0001, CLI-0002...
     
     # Dados básicos
     nome = Column(String, nullable=False, index=True)
