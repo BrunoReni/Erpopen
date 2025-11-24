@@ -378,6 +378,7 @@ class ClienteUpdate(BaseModel):
 
 class ClienteRead(ClienteBase):
     id: int
+    codigo: str
     ativo: int
     created_at: datetime
     updated_at: datetime
