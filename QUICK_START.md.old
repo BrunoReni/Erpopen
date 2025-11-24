@@ -1,0 +1,242 @@
+# 🚀 Guia de Início Rápido - ERP Open
+
+## Passo 1: Iniciar o Backend
+
+```bash
+cd backend
+
+# Ativar ambiente virtual
+source .venv/bin/activate  # Linux/Mac
+# ou
+.venv\Scripts\activate  # Windows
+
+# Instalar dependências (se necessário)
+pip install -r requirements.txt
+
+# Iniciar servidor
+uvicorn main:app --reload
+```
+
+✅ Backend rodando em: http://localhost:8000
+✅ Documentação API: http://localhost:8000/docs
+
+## Passo 2: Iniciar o Frontend
+
+Abra um novo terminal:
+
+```bash
+cd frontend
+
+# Instalar dependências (primeira vez)
+npm install
+
+# Iniciar servidor de desenvolvimento
+npm run dev
+```
+
+✅ Frontend rodando em: http://localhost:5173
+
+## Passo 3: Acessar o Sistema
+
+1. Abra o navegador em: http://localhost:5173
+2. Você será redirecionado para a tela de login
+3. Como ainda não tem conta, clique em "Registre-se"
+4. Preencha seus dados e crie uma conta
+5. Após registro, você será automaticamente logado
+6. Explore o Dashboard! 🎉
+
+## 🔐 Permissões do Primeiro Usuário
+
+O primeiro usuário criado terá o perfil **"user"** por padrão, com permissões básicas:
+- ✅ dashboard:read
+- ✅ products:read
+- ✅ customers:read
+
+### Para ter acesso Admin:
+
+**Opção 1 - Via Python (Recomendado):**
+
+```bash
+# No terminal onde o backend está rodando, pressione Ctrl+C
+# Depois execute:
+python
+
+# Cole este código:
+from app.db import SessionLocal
+from app import crud, models
+
+db = SessionLocal()
+
+# Buscar seu usuário (substitua o email)
+user = crud.get_user_by_email(db, "seu@email.com")
+
+# Buscar role admin
+admin_role = db.query(models.Role).filter(models.Role.name == "admin").first()
+
+# Adicionar role
+user.roles.append(admin_role)
+db.commit()
+
+print(f"✅ {user.email} agora é ADMIN!")
+
+# Sair do Python
+exit()
+
+# Reiniciar o servidor
+uvicorn main:app --reload
+```
+
+**Opção 2 - Via API:**
+
+Use o Swagger em http://localhost:8000/docs
+
+## 🧪 Testar o Sistema
+
+Execute o script de testes:
+
+```bash
+./test_system.sh
+```
+
+## 📦 Estrutura de Permissões
+
+### Módulos Disponíveis:
+- **Dashboard** (dashboard:read)
+- **Usuários** (users:*)
+- **Produtos** (products:*)
+- **Clientes** (customers:*)
+- **Vendas** (sales:*)
+- **Inventário** (inventory:*)
+- **Relatórios** (reports:read, reports:export)
+
+### Perfis Padrão:
+- **admin**: Todas as permissões
+- **manager**: Operacional (sem users/roles)
+- **user**: Leitura básica
+
+## 🛠️ Desenvolvimento
+
+### Adicionar Novo Módulo:
+
+#### 1. Backend - Criar Router
+
+`backend/app/routes/produtos.py`:
+```python
+from fastapi import APIRouter, Depends
+from app.dependencies import require_permission
+
+router = APIRouter()
+
+@router.get("/", dependencies=[Depends(require_permission("products:read"))])
+def list_products():
+    return {"products": []}
+
+@router.post("/", dependencies=[Depends(require_permission("products:create"))])
+def create_product(data: dict):
+    return {"message": "Product created"}
+```
+
+#### 2. Backend - Registrar Router
+
+`backend/main.py`:
+```python
+from app.routes import produtos
+
+app.include_router(produtos.router, prefix="/produtos", tags=["produtos"])
+```
+
+#### 3. Frontend - Criar Componente
+
+`frontend/src/modules/produtos/ProductsList.tsx`
+
+#### 4. Frontend - Adicionar Rota
+
+`frontend/src/App.tsx`:
+```tsx
+<Route
+  path="/products"
+  element={
+    <ProtectedRoute requiredPermissions={['products:read']}>
+      <MainLayout>
+        <ProductsList />
+      </MainLayout>
+    </ProtectedRoute>
+  }
+/>
+```
+
+#### 5. Frontend - Adicionar ao Menu
+
+O menu já está configurado! Apenas certifique-se de que a permissão está correta.
+
+## 📝 Comandos Úteis
+
+### Backend:
+```bash
+# Rodar testes
+pytest
+
+# Criar migração (quando implementar Alembic)
+alembic revision --autogenerate -m "mensagem"
+
+# Aplicar migrations
+alembic upgrade head
+```
+
+### Frontend:
+```bash
+# Build para produção
+npm run build
+
+# Preview do build
+npm run preview
+
+# Lint
+npm run lint
+```
+
+## 🐛 Troubleshooting
+
+### Backend não inicia:
+```bash
+# Verificar se porta 8000 está livre
+lsof -i :8000
+
+# Reinstalar dependências
+pip install -r requirements.txt --force-reinstall
+```
+
+### Frontend não inicia:
+```bash
+# Limpar cache e reinstalar
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Erro de CORS:
+Verifique se o backend está rodando em `localhost:8000` e o frontend em `localhost:5173`.
+
+### Permissões não aparecem:
+1. Faça logout
+2. Faça login novamente
+3. O token será regenerado com as novas permissões
+
+## 📚 Documentação Completa
+
+- **Backend API**: http://localhost:8000/docs
+- **Guia Completo**: `REVIEW_AND_SETUP.md`
+- **README Principal**: `README.md`
+
+## 🎯 Próximos Passos
+
+1. [ ] Explorar a API Documentation
+2. [ ] Criar seu primeiro CRUD completo
+3. [ ] Implementar validações
+4. [ ] Adicionar testes
+5. [ ] Configurar para produção
+
+---
+
+**Dúvidas?** Consulte os READMEs ou a documentação da API!
+
+**Bom desenvolvimento! 🚀**
