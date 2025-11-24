@@ -320,3 +320,174 @@ class MovimentoEstoqueRead(MovimentoEstoqueBase):
     
     class Config:
         from_attributes = True
+
+
+# =============================================================================
+# NOVOS SCHEMAS - FASE 1
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CLIENTES
+# -----------------------------------------------------------------------------
+
+class ClienteBase(BaseModel):
+    nome: str
+    razao_social: Optional[str] = None
+    cpf_cnpj: str
+    tipo_pessoa: str = "PF"
+    email: Optional[str] = None
+    telefone: Optional[str] = None
+    celular: Optional[str] = None
+    endereco: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    cep: Optional[str] = None
+    tipo_cliente: str = "varejo"
+    limite_credito: float = 0.0
+    dias_vencimento: int = 30
+    parceiro_vinculado_id: Optional[int] = None
+
+
+class ClienteCreate(ClienteBase):
+    pass
+
+
+class ClienteUpdate(BaseModel):
+    nome: Optional[str] = None
+    razao_social: Optional[str] = None
+    cpf_cnpj: Optional[str] = None
+    tipo_pessoa: Optional[str] = None
+    email: Optional[str] = None
+    telefone: Optional[str] = None
+    celular: Optional[str] = None
+    endereco: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    cep: Optional[str] = None
+    tipo_cliente: Optional[str] = None
+    limite_credito: Optional[float] = None
+    dias_vencimento: Optional[int] = None
+    ativo: Optional[int] = None
+
+
+class ClienteRead(ClienteBase):
+    id: int
+    ativo: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# -----------------------------------------------------------------------------
+# UNIDADES DE MEDIDA
+# -----------------------------------------------------------------------------
+
+class UnidadeMedidaBase(BaseModel):
+    sigla: str
+    nome: str
+    tipo: Optional[str] = None
+    permite_decimal: int = 1
+    unidade_base_id: Optional[int] = None
+    fator_conversao: float = 1.0
+
+
+class UnidadeMedidaCreate(UnidadeMedidaBase):
+    pass
+
+
+class UnidadeMedidaUpdate(BaseModel):
+    nome: Optional[str] = None
+    tipo: Optional[str] = None
+    permite_decimal: Optional[int] = None
+    ativa: Optional[int] = None
+
+
+class UnidadeMedidaRead(UnidadeMedidaBase):
+    id: int
+    ativa: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# -----------------------------------------------------------------------------
+# LOCAIS DE ESTOQUE
+# -----------------------------------------------------------------------------
+
+class LocalEstoqueBase(BaseModel):
+    codigo: str
+    nome: str
+    tipo: str = "almoxarifado"
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    responsavel: Optional[str] = None
+    telefone: Optional[str] = None
+    padrao: int = 0
+
+
+class LocalEstoqueCreate(LocalEstoqueBase):
+    pass
+
+
+class LocalEstoqueUpdate(BaseModel):
+    nome: Optional[str] = None
+    tipo: Optional[str] = None
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    responsavel: Optional[str] = None
+    telefone: Optional[str] = None
+    padrao: Optional[int] = None
+    ativo: Optional[int] = None
+
+
+class LocalEstoqueRead(LocalEstoqueBase):
+    id: int
+    ativo: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# -----------------------------------------------------------------------------
+# ESTOQUE POR LOCAL
+# -----------------------------------------------------------------------------
+
+class EstoquePorLocalBase(BaseModel):
+    material_id: int
+    local_id: int
+    quantidade: float = 0.0
+    estoque_minimo: float = 0.0
+    estoque_maximo: float = 0.0
+    localizacao_fisica: Optional[str] = None
+
+
+class EstoquePorLocalCreate(EstoquePorLocalBase):
+    pass
+
+
+class EstoquePorLocalUpdate(BaseModel):
+    quantidade: Optional[float] = None
+    estoque_minimo: Optional[float] = None
+    estoque_maximo: Optional[float] = None
+    localizacao_fisica: Optional[str] = None
+
+
+class EstoquePorLocalRead(EstoquePorLocalBase):
+    id: int
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+

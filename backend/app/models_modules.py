@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -26,6 +26,14 @@ class TipoMovimento(str, enum.Enum):
     SAIDA = "saida"
     AJUSTE = "ajuste"
     TRANSFERENCIA = "transferencia"
+
+
+class StatusVenda(str, enum.Enum):
+    ORCAMENTO = "orcamento"
+    APROVADO = "aprovado"
+    FATURADO = "faturado"
+    CANCELADO = "cancelado"
+    ENTREGUE = "entregue"
 
 
 # =============================================================================
@@ -130,9 +138,15 @@ class ContaPagar(Base):
     data_pagamento = Column(DateTime)
     valor_original = Column(Float, nullable=False)
     valor_pago = Column(Float, default=0.0)
+    
+    # NOVOS campos
+    juros = Column(Float, default=0.0)
+    desconto = Column(Float, default=0.0)
+    
     status = Column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
     observacoes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
     fornecedor = relationship("Fornecedor")
@@ -143,16 +157,29 @@ class ContaReceber(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     descricao = Column(String, nullable=False)
-    cliente = Column(String)  # Por enquanto string, depois pode virar FK
+    
+    # ATUALIZADO: De String para FK
+    cliente_nome = Column(String, nullable=True)  # Mantido para compatibilidade com dados antigos
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)  # Novo FK
+    
     centro_custo_id = Column(Integer, ForeignKey("centros_custo.id"))
     data_emissao = Column(DateTime, default=datetime.utcnow)
     data_vencimento = Column(DateTime, nullable=False)
     data_recebimento = Column(DateTime)
     valor_original = Column(Float, nullable=False)
     valor_recebido = Column(Float, default=0.0)
+    
+    # NOVOS campos
+    juros = Column(Float, default=0.0)
+    desconto = Column(Float, default=0.0)
+    
     status = Column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
     observacoes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    cliente = relationship("Cliente", back_populates="contas_receber")
 
 
 # =============================================================================
@@ -176,17 +203,25 @@ class Material(Base):
     nome = Column(String, nullable=False, index=True)
     descricao = Column(Text)
     categoria_id = Column(Integer, ForeignKey("categorias_material.id"))
-    unidade_medida = Column(String, nullable=False)  # UN, KG, M, L, etc
+    
+    # ATUALIZADO: Unidade de medida como FK
+    unidade_medida = Column(String, nullable=False)  # Mantido para compatibilidade
+    unidade_medida_id = Column(Integer, ForeignKey("unidades_medida.id"), nullable=True)  # Novo FK
+    
     estoque_minimo = Column(Float, default=0.0)
     estoque_maximo = Column(Float, default=0.0)
     estoque_atual = Column(Float, default=0.0)
     preco_medio = Column(Float, default=0.0)
+    preco_venda = Column(Float, default=0.0)  # NOVO
     localizacao = Column(String)
     ativo = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
     categoria = relationship("CategoriaMaterial")
+    unidade_obj = relationship("UnidadeMedida", back_populates="materiais")
+    estoques_locais = relationship("EstoquePorLocal", back_populates="material")
     movimentos = relationship("MovimentoEstoque", back_populates="material")
 
 
@@ -202,5 +237,142 @@ class MovimentoEstoque(Base):
     observacao = Column(Text)
     usuario_id = Column(Integer)  # Quem fez o movimento
     
+    # Novos campos para locais
+    local_origem_id = Column(Integer, ForeignKey("locais_estoque.id"), nullable=True)
+    local_destino_id = Column(Integer, ForeignKey("locais_estoque.id"), nullable=True)
+    
     # Relacionamentos
     material = relationship("Material", back_populates="movimentos")
+    local_origem = relationship("LocalEstoque", foreign_keys=[local_origem_id])
+    local_destino = relationship("LocalEstoque", foreign_keys=[local_destino_id])
+
+
+# =============================================================================
+# NOVOS MODELOS - FASE 1
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CLIENTES
+# -----------------------------------------------------------------------------
+
+class Cliente(Base):
+    __tablename__ = "clientes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Dados básicos
+    nome = Column(String, nullable=False, index=True)
+    razao_social = Column(String)
+    cpf_cnpj = Column(String, unique=True, index=True)
+    tipo_pessoa = Column(String, default="PF")  # PF ou PJ
+    
+    # Contato
+    email = Column(String)
+    telefone = Column(String)
+    celular = Column(String)
+    
+    # Endereço
+    endereco = Column(String)
+    numero = Column(String)
+    complemento = Column(String)
+    bairro = Column(String)
+    cidade = Column(String)
+    estado = Column(String)
+    cep = Column(String)
+    
+    # Informações comerciais
+    tipo_cliente = Column(String, default="varejo")  # varejo, atacado, distribuidor
+    limite_credito = Column(Float, default=0.0)
+    dias_vencimento = Column(Integer, default=30)
+    
+    # Vínculo opcional com fornecedor (para empresas que são ambos)
+    parceiro_vinculado_id = Column(Integer, ForeignKey("fornecedores.id"), nullable=True)
+    
+    # Controle
+    ativo = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    contas_receber = relationship("ContaReceber", back_populates="cliente")
+
+
+# -----------------------------------------------------------------------------
+# UNIDADES DE MEDIDA
+# -----------------------------------------------------------------------------
+
+class UnidadeMedida(Base):
+    __tablename__ = "unidades_medida"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sigla = Column(String, unique=True, nullable=False, index=True)
+    nome = Column(String, nullable=False)
+    tipo = Column(String)  # peso, volume, comprimento, area, unidade
+    permite_decimal = Column(Integer, default=1)  # 1=sim, 0=não
+    
+    # Conversões (opcional para futuro)
+    unidade_base_id = Column(Integer, ForeignKey("unidades_medida.id"), nullable=True)
+    fator_conversao = Column(Float, default=1.0)
+    
+    # Controle
+    ativa = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    materiais = relationship("Material", back_populates="unidade_obj")
+
+
+# -----------------------------------------------------------------------------
+# LOCAIS DE ESTOQUE
+# -----------------------------------------------------------------------------
+
+class LocalEstoque(Base):
+    __tablename__ = "locais_estoque"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, unique=True, nullable=False, index=True)
+    nome = Column(String, nullable=False)
+    tipo = Column(String, default="almoxarifado")  # almoxarifado, loja, deposito, producao
+    
+    # Localização
+    endereco = Column(String)
+    cidade = Column(String)
+    estado = Column(String)
+    responsavel = Column(String)
+    telefone = Column(String)
+    
+    # Controle
+    ativo = Column(Integer, default=1)
+    padrao = Column(Integer, default=0)  # Local padrão para movimentações
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    estoques = relationship("EstoquePorLocal", back_populates="local")
+
+
+# -----------------------------------------------------------------------------
+# ESTOQUE POR LOCAL
+# -----------------------------------------------------------------------------
+
+class EstoquePorLocal(Base):
+    __tablename__ = "estoque_por_local"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("materiais.id"), nullable=False)
+    local_id = Column(Integer, ForeignKey("locais_estoque.id"), nullable=False)
+    
+    quantidade = Column(Float, default=0.0)
+    estoque_minimo = Column(Float, default=0.0)
+    estoque_maximo = Column(Float, default=0.0)
+    localizacao_fisica = Column(String)  # Prateleira, corredor, etc
+    
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    material = relationship("Material", back_populates="estoques_locais")
+    local = relationship("LocalEstoque", back_populates="estoques")
+    
+    # Unique constraint
+    __table_args__ = (
+        UniqueConstraint('material_id', 'local_id', name='uk_material_local'),
+    )
