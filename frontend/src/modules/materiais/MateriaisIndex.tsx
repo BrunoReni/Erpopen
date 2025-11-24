@@ -22,7 +22,7 @@ export function MateriaisIndex() {
       title: 'Movimentação',
       description: 'Entradas e saídas de estoque',
       icon: TrendingDown,
-      path: '/materiais/movimentacao',
+      path: '/materiais/estoque',
       color: 'bg-yellow-500'
     },
     {

@@ -1,6 +1,6 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Link } from 'react-router-dom';
-import { DollarSign, CreditCard, Building2, TrendingUp } from 'lucide-react';
+import { DollarSign, CreditCard, Building2, Target } from 'lucide-react';
 
 export function FinanceiroIndex() {
   const modules = [
@@ -26,10 +26,10 @@ export function FinanceiroIndex() {
       color: 'bg-blue-500'
     },
     {
-      title: 'Fluxo de Caixa',
-      description: 'Análise e projeções financeiras',
-      icon: TrendingUp,
-      path: '/financeiro/fluxo-caixa',
+      title: 'Centros de Custo',
+      description: 'Gestão de centros de custo',
+      icon: Target,
+      path: '/financeiro/centros-custo',
       color: 'bg-purple-500'
     }
   ];
