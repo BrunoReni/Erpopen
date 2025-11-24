@@ -13,6 +13,8 @@ import { ContasReceberList } from './modules/financeiro/ContasReceberList';
 import { ContasBancariasList } from './modules/financeiro/ContasBancariasList';
 import { CentrosCustoList } from './modules/financeiro/CentrosCustoList';
 import { MateriaisIndex } from './modules/materiais/MateriaisIndex';
+import { VendasIndex } from './modules/vendas/VendasIndex';
+import { ClientesList } from './modules/vendas/ClientesList';
 import { MateriaisList } from './modules/materiais/MateriaisList';
 import { MovimentosEstoqueList } from './modules/materiais/MovimentosEstoqueList';
 import { UsersList } from './modules/users/UsersList';
@@ -132,6 +134,25 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['materiais:read']}>
                 <MovimentosEstoqueList />
+          
+          {/* Vendas/Comercial */}
+          <Route
+            path="/vendas"
+            element={
+              <ProtectedRoute requiredPermissions={['users:read']}>
+                <VendasIndex />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/vendas/clientes"
+            element={
+              <ProtectedRoute requiredPermissions={['users:read']}>
+                <ClientesList />
+              </ProtectedRoute>
+            }
+          />
               </ProtectedRoute>
             }
           />

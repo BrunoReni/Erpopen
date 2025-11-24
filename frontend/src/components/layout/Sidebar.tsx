@@ -50,6 +50,13 @@ export function Sidebar() {
       requiredPermissions: ['materiais:read']
     },
     { 
+      id: 'vendas', 
+      label: 'Vendas', 
+      icon: 'users', 
+      path: '/vendas',
+      requiredPermissions: ['users:read']
+    },
+    { 
       id: 'users', 
       label: 'Usuários', 
       icon: 'users', 
