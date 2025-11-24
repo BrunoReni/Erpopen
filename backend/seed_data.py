@@ -105,3 +105,128 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🎉 SEED CONCLUÍDO COM SUCESSO!")
     print("=" * 60)
+
+
+def seed_materiais_teste():
+    """Cria materiais de teste com estoque inicial"""
+    from app.models_modules import Material, EstoquePorLocal, LocalEstoque, UnidadeMedida
+    from app.helpers import gerar_codigo_material
+    
+    db = SessionLocal()
+    
+    print("\n📦 Criando materiais de teste...")
+    
+    try:
+        # Buscar unidades de medida
+        un = db.query(UnidadeMedida).filter(UnidadeMedida.sigla == "UN").first()
+        kg = db.query(UnidadeMedida).filter(UnidadeMedida.sigla == "KG").first()
+        
+        # Buscar local padrão
+        local_padrao = db.query(LocalEstoque).first()
+        
+        # Verificar se já existem materiais
+        count = db.query(Material).count()
+        if count > 0:
+            print(f"⚠️  Já existem {count} materiais. Pulando seed.")
+            return
+        
+        # Material 1
+        mat1 = Material(
+            codigo=gerar_codigo_material(db),
+            nome="Caneta Azul",
+            descricao="Caneta esferográfica azul",
+            unidade_medida="UN",
+            unidade_medida_id=un.id if un else None,
+            estoque_minimo=10.0,
+            estoque_maximo=100.0,
+            estoque_atual=0.0,
+            preco_medio=1.50,
+            preco_venda=2.50,
+            ativo=1
+        )
+        db.add(mat1)
+        db.flush()
+        
+        # Adicionar estoque inicial no local padrão
+        if local_padrao:
+            estoque1 = EstoquePorLocal(
+                material_id=mat1.id,
+                local_id=local_padrao.id,
+                quantidade=50.0
+            )
+            db.add(estoque1)
+            mat1.estoque_atual = 50.0
+        
+        print(f"  ✅ {mat1.codigo} - {mat1.nome} (Estoque: 50 UN)")
+        
+        # Material 2
+        mat2 = Material(
+            codigo=gerar_codigo_material(db),
+            nome="Papel A4",
+            descricao="Resma de papel A4 - 500 folhas",
+            unidade_medida="UN",
+            unidade_medida_id=un.id if un else None,
+            estoque_minimo=5.0,
+            estoque_maximo=50.0,
+            estoque_atual=0.0,
+            preco_medio=25.00,
+            preco_venda=35.00,
+            ativo=1
+        )
+        db.add(mat2)
+        db.flush()
+        
+        if local_padrao:
+            estoque2 = EstoquePorLocal(
+                material_id=mat2.id,
+                local_id=local_padrao.id,
+                quantidade=20.0
+            )
+            db.add(estoque2)
+            mat2.estoque_atual = 20.0
+        
+        print(f"  ✅ {mat2.codigo} - {mat2.nome} (Estoque: 20 UN)")
+        
+        # Material 3
+        mat3 = Material(
+            codigo=gerar_codigo_material(db),
+            nome="Café em Pó",
+            descricao="Café torrado e moído - pacote 500g",
+            unidade_medida="KG",
+            unidade_medida_id=kg.id if kg else None,
+            estoque_minimo=2.0,
+            estoque_maximo=20.0,
+            estoque_atual=0.0,
+            preco_medio=15.00,
+            preco_venda=20.00,
+            ativo=1
+        )
+        db.add(mat3)
+        db.flush()
+        
+        if local_padrao:
+            estoque3 = EstoquePorLocal(
+                material_id=mat3.id,
+                local_id=local_padrao.id,
+                quantidade=10.5
+            )
+            db.add(estoque3)
+            mat3.estoque_atual = 10.5
+        
+        print(f"  ✅ {mat3.codigo} - {mat3.nome} (Estoque: 10.5 KG)")
+        
+        db.commit()
+        print("\n✅ 3 materiais criados com sucesso!")
+        
+    except Exception as e:
+        print(f"\n❌ Erro ao criar materiais: {e}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+    finally:
+        db.close()
+
+
+# Executar seed de materiais se for main
+if __name__ == "__main__":
+    seed_materiais_teste()

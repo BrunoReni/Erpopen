@@ -255,3 +255,239 @@ def get_historico_material(
             for m in movimentos
         ]
     }
+
+
+# =============================================================================
+# SALDO E ESTOQUE POR LOCAL
+# =============================================================================
+
+@router.get("/materiais/{material_id}/saldo")
+def get_saldo_material(
+    material_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("materiais:read"))
+):
+    """Retorna o saldo total e por local de um material"""
+    from app.models_modules import EstoquePorLocal, LocalEstoque
+    from app.helpers import calcular_estoque_total
+    
+    material = session.query(Material).filter(Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material não encontrado")
+    
+    # Buscar estoques por local
+    estoques_locais = session.query(
+        EstoquePorLocal, LocalEstoque
+    ).join(
+        LocalEstoque, EstoquePorLocal.local_id == LocalEstoque.id
+    ).filter(
+        EstoquePorLocal.material_id == material_id
+    ).all()
+    
+    # Calcular total
+    total = calcular_estoque_total(material_id, session)
+    
+    return {
+        "material": {
+            "id": material.id,
+            "codigo": material.codigo,
+            "nome": material.nome,
+            "unidade_medida": material.unidade_medida
+        },
+        "estoque_total": total,
+        "estoques_por_local": [
+            {
+                "local_id": estoque.local_id,
+                "local_codigo": local.codigo,
+                "local_nome": local.nome,
+                "quantidade": estoque.quantidade,
+                "updated_at": estoque.updated_at
+            }
+            for estoque, local in estoques_locais
+        ]
+    }
+
+
+@router.get("/locais/{local_id}/estoque")
+def get_estoque_por_local(
+    local_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    busca: str = None,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("materiais:read"))
+):
+    """Lista todos os materiais com estoque em um local específico"""
+    from app.models_modules import EstoquePorLocal, LocalEstoque
+    
+    # Verificar se local existe
+    local = session.query(LocalEstoque).filter(LocalEstoque.id == local_id).first()
+    if not local:
+        raise HTTPException(status_code=404, detail="Local de estoque não encontrado")
+    
+    # Buscar estoques
+    query = session.query(
+        EstoquePorLocal, Material
+    ).join(
+        Material, EstoquePorLocal.material_id == Material.id
+    ).filter(
+        EstoquePorLocal.local_id == local_id,
+        EstoquePorLocal.quantidade > 0  # Apenas com saldo
+    )
+    
+    # Filtro de busca
+    if busca:
+        query = query.filter(
+            (Material.codigo.contains(busca)) |
+            (Material.nome.contains(busca))
+        )
+    
+    estoques = query.offset(skip).limit(limit).all()
+    
+    return {
+        "local": {
+            "id": local.id,
+            "codigo": local.codigo,
+            "nome": local.nome,
+            "tipo": local.tipo
+        },
+        "materiais": [
+            {
+                "material_id": material.id,
+                "codigo": material.codigo,
+                "nome": material.nome,
+                "unidade_medida": material.unidade_medida,
+                "quantidade": estoque.quantidade,
+                "estoque_minimo": material.estoque_minimo,
+                "estoque_maximo": material.estoque_maximo,
+                "updated_at": estoque.updated_at
+            }
+            for estoque, material in estoques
+        ]
+    }
+
+
+@router.post("/movimentacoes/processar")
+def processar_movimentacao(
+    movimento_data: MovimentoEstoqueCreate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("materiais:write"))
+):
+    """
+    Processa uma movimentação de estoque
+    Atualiza automaticamente os saldos por local e estoque total
+    """
+    from app.helpers import processar_movimentacao_estoque
+    
+    # Processar movimentação
+    resultado = processar_movimentacao_estoque(
+        material_id=movimento_data.material_id,
+        tipo_movimento=movimento_data.tipo_movimento.value,
+        quantidade=movimento_data.quantidade,
+        local_origem_id=movimento_data.local_origem_id,
+        local_destino_id=movimento_data.local_destino_id,
+        db=session,
+        permitir_negativo=False  # Não permite estoque negativo por padrão
+    )
+    
+    if not resultado["sucesso"]:
+        raise HTTPException(status_code=400, detail=resultado["mensagem"])
+    
+    # Criar registro de movimentação
+    movimento = MovimentoEstoque(
+        material_id=movimento_data.material_id,
+        tipo_movimento=movimento_data.tipo_movimento,
+        quantidade=movimento_data.quantidade,
+        documento=movimento_data.documento,
+        observacao=movimento_data.observacao,
+        local_origem_id=movimento_data.local_origem_id,
+        local_destino_id=movimento_data.local_destino_id,
+        data_movimento=movimento_data.data_movimento or datetime.utcnow()
+    )
+    
+    session.add(movimento)
+    session.commit()
+    session.refresh(movimento)
+    
+    return {
+        "mensagem": resultado["mensagem"],
+        "estoque_total": resultado["estoque_total"],
+        "movimento": {
+            "id": movimento.id,
+            "tipo_movimento": movimento.tipo_movimento,
+            "quantidade": movimento.quantidade,
+            "data_movimento": movimento.data_movimento
+        }
+    }
+
+
+@router.get("/relatorios/posicao-estoque")
+def relatorio_posicao_estoque(
+    local_id: int = None,
+    categoria_id: int = None,
+    apenas_zerados: bool = False,
+    apenas_criticos: bool = False,
+    skip: int = 0,
+    limit: int = 100,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("materiais:read"))
+):
+    """
+    Relatório de posição de estoque com diversos filtros
+    """
+    from app.models_modules import EstoquePorLocal
+    from sqlalchemy import func
+    
+    if local_id:
+        # Posição por local específico
+        query = session.query(
+            Material,
+            EstoquePorLocal.quantidade
+        ).join(
+            EstoquePorLocal, Material.id == EstoquePorLocal.material_id
+        ).filter(
+            EstoquePorLocal.local_id == local_id
+        )
+    else:
+        # Posição consolidada (usa estoque_atual do material)
+        query = session.query(Material, Material.estoque_atual)
+    
+    # Filtro por categoria
+    if categoria_id:
+        query = query.filter(Material.categoria_id == categoria_id)
+    
+    # Filtro por zerados
+    if apenas_zerados:
+        if local_id:
+            query = query.filter(EstoquePorLocal.quantidade == 0)
+        else:
+            query = query.filter(Material.estoque_atual == 0)
+    
+    # Filtro por críticos (abaixo do mínimo)
+    if apenas_criticos:
+        if local_id:
+            query = query.filter(EstoquePorLocal.quantidade < Material.estoque_minimo)
+        else:
+            query = query.filter(Material.estoque_atual < Material.estoque_minimo)
+    
+    # Apenas ativos
+    query = query.filter(Material.ativo == 1)
+    
+    materiais = query.offset(skip).limit(limit).all()
+    
+    return [
+        {
+            "id": material.id,
+            "codigo": material.codigo,
+            "nome": material.nome,
+            "unidade_medida": material.unidade_medida,
+            "quantidade": quantidade,
+            "estoque_minimo": material.estoque_minimo,
+            "estoque_maximo": material.estoque_maximo,
+            "status": "CRÍTICO" if quantidade < material.estoque_minimo 
+                     else "ZERADO" if quantidade == 0 
+                     else "NORMAL",
+            "categoria": material.categoria.nome if material.categoria else None
+        }
+        for material, quantidade in materiais
+    ]
