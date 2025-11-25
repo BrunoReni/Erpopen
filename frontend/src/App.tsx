@@ -134,12 +134,15 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['materiais:read']}>
                 <MovimentosEstoqueList />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Vendas/Comercial */}
           <Route
             path="/vendas"
             element={
-              <ProtectedRoute requiredPermissions={['users:read']}>
+              <ProtectedRoute requiredPermissions={['vendas:read']}>
                 <VendasIndex />
               </ProtectedRoute>
             }
@@ -148,11 +151,8 @@ function App() {
           <Route
             path="/vendas/clientes"
             element={
-              <ProtectedRoute requiredPermissions={['users:read']}>
+              <ProtectedRoute requiredPermissions={['vendas:read']}>
                 <ClientesList />
-              </ProtectedRoute>
-            }
-          />
               </ProtectedRoute>
             }
           />
