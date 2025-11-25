@@ -31,6 +31,16 @@ class TipoMovimento(str, Enum):
     TRANSFERENCIA = "transferencia"
 
 
+class StatusCotacao(str, Enum):
+    RASCUNHO = "rascunho"
+    ENVIADA = "enviada"
+    RESPONDIDA = "respondida"
+    APROVADA = "aprovada"
+    REJEITADA = "rejeitada"
+    CONVERTIDA = "convertida"
+    CANCELADA = "cancelada"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS - SCHEMAS
 # =============================================================================
@@ -488,6 +498,111 @@ class EstoquePorLocalUpdate(BaseModel):
 class EstoquePorLocalRead(EstoquePorLocalBase):
     id: int
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# =============================================================================
+# MÓDULO DE COTAÇÕES - SCHEMAS
+# =============================================================================
+
+# Item Cotação
+class ItemCotacaoBase(BaseModel):
+    material_id: Optional[int] = None
+    descricao: str
+    quantidade: float
+    unidade: str = "UN"
+    observacoes: Optional[str] = None
+
+
+class ItemCotacaoCreate(ItemCotacaoBase):
+    pass
+
+
+class ItemCotacaoRead(ItemCotacaoBase):
+    id: int
+    cotacao_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+# Item Resposta Fornecedor
+class ItemRespostaFornecedorBase(BaseModel):
+    item_cotacao_id: int
+    preco_unitario: float
+    marca: Optional[str] = None
+    observacoes: Optional[str] = None
+
+
+class ItemRespostaFornecedorCreate(ItemRespostaFornecedorBase):
+    pass
+
+
+class ItemRespostaFornecedorRead(ItemRespostaFornecedorBase):
+    id: int
+    resposta_id: int
+    preco_total: float
+    
+    class Config:
+        from_attributes = True
+
+
+# Resposta Fornecedor
+class RespostaFornecedorBase(BaseModel):
+    fornecedor_id: int
+    prazo_entrega_dias: Optional[int] = None
+    condicao_pagamento: Optional[str] = None
+    observacoes: Optional[str] = None
+
+
+class RespostaFornecedorCreate(RespostaFornecedorBase):
+    itens: List[ItemRespostaFornecedorCreate]
+
+
+class RespostaFornecedorRead(RespostaFornecedorBase):
+    id: int
+    cotacao_id: int
+    data_resposta: datetime
+    valor_total: float
+    selecionada: int
+    itens_resposta: List[ItemRespostaFornecedorRead] = []
+    
+    class Config:
+        from_attributes = True
+
+
+# Cotação
+class CotacaoBase(BaseModel):
+    descricao: str
+    data_limite_resposta: Optional[datetime] = None
+    observacoes: Optional[str] = None
+
+
+class CotacaoCreate(CotacaoBase):
+    itens: List[ItemCotacaoCreate]
+
+
+class CotacaoUpdate(BaseModel):
+    descricao: Optional[str] = None
+    data_limite_resposta: Optional[datetime] = None
+    status: Optional[StatusCotacao] = None
+    observacoes: Optional[str] = None
+
+
+class CotacaoRead(CotacaoBase):
+    id: int
+    numero: str
+    data_solicitacao: datetime
+    status: StatusCotacao
+    convertida_pedido_id: Optional[int] = None
+    melhor_fornecedor_id: Optional[int] = None
+    created_by: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    itens: List[ItemCotacaoRead] = []
+    respostas: List[RespostaFornecedorRead] = []
     
     class Config:
         from_attributes = True

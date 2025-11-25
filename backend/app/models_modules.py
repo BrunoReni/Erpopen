@@ -36,6 +36,16 @@ class StatusVenda(str, enum.Enum):
     ENTREGUE = "entregue"
 
 
+class StatusCotacao(str, enum.Enum):
+    RASCUNHO = "rascunho"
+    ENVIADA = "enviada"
+    RESPONDIDA = "respondida"
+    APROVADA = "aprovada"
+    REJEITADA = "rejeitada"
+    CONVERTIDA = "convertida"
+    CANCELADA = "cancelada"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS
 # =============================================================================
@@ -96,6 +106,83 @@ class ItemPedidoCompra(Base):
     # Relacionamentos
     pedido = relationship("PedidoCompra", back_populates="itens")
     material = relationship("Material")
+
+
+class Cotacao(Base):
+    __tablename__ = "cotacoes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(String, unique=True, index=True, nullable=False)  # COT-0001
+    descricao = Column(String, nullable=False)
+    data_solicitacao = Column(DateTime, default=datetime.utcnow)
+    data_limite_resposta = Column(DateTime)
+    status = Column(SQLEnum(StatusCotacao), default=StatusCotacao.RASCUNHO)
+    observacoes = Column(Text)
+    
+    # Controle de conversão
+    convertida_pedido_id = Column(Integer, ForeignKey("pedidos_compra.id"), nullable=True)
+    melhor_fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"), nullable=True)
+    
+    created_by = Column(Integer)  # ID do usuário que criou
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    itens = relationship("ItemCotacao", back_populates="cotacao", cascade="all, delete-orphan")
+    respostas = relationship("RespostaFornecedor", back_populates="cotacao", cascade="all, delete-orphan")
+    melhor_fornecedor = relationship("Fornecedor", foreign_keys=[melhor_fornecedor_id])
+
+
+class ItemCotacao(Base):
+    __tablename__ = "itens_cotacao"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    cotacao_id = Column(Integer, ForeignKey("cotacoes.id"))
+    material_id = Column(Integer, ForeignKey("materiais.id"), nullable=True)
+    descricao = Column(String, nullable=False)
+    quantidade = Column(Float, nullable=False)
+    unidade = Column(String, default="UN")
+    observacoes = Column(Text)
+    
+    # Relacionamentos
+    cotacao = relationship("Cotacao", back_populates="itens")
+    material = relationship("Material")
+    respostas = relationship("ItemRespostaFornecedor", back_populates="item_cotacao")
+
+
+class RespostaFornecedor(Base):
+    __tablename__ = "respostas_fornecedor"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    cotacao_id = Column(Integer, ForeignKey("cotacoes.id"))
+    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"))
+    data_resposta = Column(DateTime, default=datetime.utcnow)
+    prazo_entrega_dias = Column(Integer)
+    condicao_pagamento = Column(String)
+    observacoes = Column(Text)
+    valor_total = Column(Float, default=0.0)
+    selecionada = Column(Integer, default=0)  # 1 se for a escolhida
+    
+    # Relacionamentos
+    cotacao = relationship("Cotacao", back_populates="respostas")
+    fornecedor = relationship("Fornecedor")
+    itens_resposta = relationship("ItemRespostaFornecedor", back_populates="resposta", cascade="all, delete-orphan")
+
+
+class ItemRespostaFornecedor(Base):
+    __tablename__ = "itens_resposta_fornecedor"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    resposta_id = Column(Integer, ForeignKey("respostas_fornecedor.id"))
+    item_cotacao_id = Column(Integer, ForeignKey("itens_cotacao.id"))
+    preco_unitario = Column(Float, nullable=False)
+    preco_total = Column(Float, nullable=False)
+    marca = Column(String)
+    observacoes = Column(Text)
+    
+    # Relacionamentos
+    resposta = relationship("RespostaFornecedor", back_populates="itens_resposta")
+    item_cotacao = relationship("ItemCotacao", back_populates="respostas")
 
 
 # =============================================================================

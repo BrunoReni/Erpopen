@@ -4,6 +4,40 @@ from sqlalchemy.orm import Session
 from app.models_modules import Fornecedor, Cliente, Material
 
 
+def gerar_proximo_codigo(db: Session, model, prefixo: str) -> str:
+    """
+    Gera código automático sequencial genérico
+    
+    Args:
+        db: Sessão do banco
+        model: Classe do modelo SQLAlchemy
+        prefixo: Prefixo do código (ex: "COT", "FOR", "CLI")
+    
+    Returns:
+        String com código formatado (ex: "COT-0001")
+    """
+    ultimo = db.query(model).filter(
+        model.numero.isnot(None) if hasattr(model, 'numero') else model.codigo.isnot(None)
+    ).order_by(model.id.desc()).first()
+    
+    campo = 'numero' if hasattr(model, 'numero') else 'codigo'
+    
+    if ultimo:
+        codigo_atual = getattr(ultimo, campo)
+        if codigo_atual:
+            try:
+                # Extrai o número do último código (COT-0001 -> 1)
+                num = int(codigo_atual.split('-')[1]) + 1
+            except (IndexError, ValueError):
+                num = 1
+        else:
+            num = 1
+    else:
+        num = 1
+    
+    return f"{prefixo}-{num:04d}"
+
+
 def gerar_codigo_fornecedor(db: Session) -> str:
     """
     Gera código automático sequencial para fornecedor

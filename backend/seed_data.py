@@ -107,6 +107,81 @@ if __name__ == "__main__":
     print("=" * 60)
 
 
+def seed_fornecedores_teste():
+    """Cria fornecedores de teste"""
+    from app.models_modules import Fornecedor
+    from app.helpers import gerar_codigo_fornecedor
+    
+    db = SessionLocal()
+    
+    print("\n🏢 Criando fornecedores de teste...")
+    
+    try:
+        # Verificar se já existem fornecedores
+        count = db.query(Fornecedor).count()
+        if count > 0:
+            print(f"⚠️  Já existem {count} fornecedores. Pulando seed.")
+            return
+        
+        fornecedores = [
+            {
+                "nome": "Papelaria Central",
+                "razao_social": "Papelaria Central Ltda",
+                "cnpj": "12.345.678/0001-90",
+                "email": "contato@papelariacentral.com.br",
+                "telefone": "(11) 3456-7890",
+                "endereco": "Rua dos Escritórios, 123",
+                "cidade": "São Paulo",
+                "estado": "SP",
+                "cep": "01234-567"
+            },
+            {
+                "nome": "TechSupply Informática",
+                "razao_social": "TechSupply Comércio de Informática S/A",
+                "cnpj": "98.765.432/0001-10",
+                "email": "vendas@techsupply.com.br",
+                "telefone": "(11) 2345-6789",
+                "endereco": "Av. Tecnologia, 456",
+                "cidade": "São Paulo",
+                "estado": "SP",
+                "cep": "01234-890"
+            },
+            {
+                "nome": "Distribuidora Limpa Tudo",
+                "razao_social": "Limpa Tudo Distribuidora Ltda ME",
+                "cnpj": "11.222.333/0001-44",
+                "email": "comercial@limpatudo.com.br",
+                "telefone": "(11) 4567-8901",
+                "endereco": "Rua da Limpeza, 789",
+                "cidade": "São Paulo",
+                "estado": "SP",
+                "cep": "01234-000"
+            }
+        ]
+        
+        for forn_data in fornecedores:
+            codigo = gerar_codigo_fornecedor(db)
+            fornecedor = Fornecedor(
+                codigo=codigo,
+                **forn_data,
+                ativo=1
+            )
+            db.add(fornecedor)
+            db.flush()  # Flush para garantir código único
+            print(f"  ✅ {codigo} - {forn_data['nome']}")
+        
+        db.commit()
+        print(f"\n✅ {len(fornecedores)} fornecedores criados com sucesso!")
+        
+    except Exception as e:
+        print(f"\n❌ Erro ao criar fornecedores: {e}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+    finally:
+        db.close()
+
+
 def seed_materiais_teste():
     """Cria materiais de teste com estoque inicial"""
     from app.models_modules import Material, EstoquePorLocal, LocalEstoque, UnidadeMedida
@@ -229,4 +304,5 @@ def seed_materiais_teste():
 
 # Executar seed de materiais se for main
 if __name__ == "__main__":
+    seed_fornecedores_teste()
     seed_materiais_teste()
