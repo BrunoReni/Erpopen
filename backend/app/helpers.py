@@ -104,6 +104,28 @@ def gerar_codigo_material(db: Session) -> str:
     return f"MAT-{num:04d}"
 
 
+def gerar_codigo_local_estoque(db: Session) -> str:
+    """
+    Gera código automático sequencial para local de estoque
+    Formato: LOC-0001, LOC-0002, etc
+    """
+    from app.models_modules import LocalEstoque
+    
+    ultimo = db.query(LocalEstoque).filter(
+        LocalEstoque.codigo.isnot(None)
+    ).order_by(LocalEstoque.id.desc()).first()
+    
+    if ultimo and ultimo.codigo:
+        try:
+            num = int(ultimo.codigo.split('-')[1]) + 1
+        except (IndexError, ValueError):
+            num = 1
+    else:
+        num = 1
+    
+    return f"LOC-{num:04d}"
+
+
 def validar_cpf(cpf: str) -> bool:
     """
     Valida CPF brasileiro

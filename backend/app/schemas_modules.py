@@ -472,6 +472,47 @@ class LocalEstoqueRead(LocalEstoqueBase):
 
 
 # -----------------------------------------------------------------------------
+# LOCAIS DE ESTOQUE (ARMAZÉNS)
+# -----------------------------------------------------------------------------
+
+class LocalEstoqueBase(BaseModel):
+    nome: str
+    tipo: str = "almoxarifado"  # almoxarifado, loja, deposito, producao
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    responsavel: Optional[str] = None
+    telefone: Optional[str] = None
+    ativo: int = 1
+    padrao: int = 0
+
+
+class LocalEstoqueCreate(LocalEstoqueBase):
+    pass
+
+
+class LocalEstoqueUpdate(BaseModel):
+    nome: Optional[str] = None
+    tipo: Optional[str] = None
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+    responsavel: Optional[str] = None
+    telefone: Optional[str] = None
+    ativo: Optional[int] = None
+    padrao: Optional[int] = None
+
+
+class LocalEstoqueRead(LocalEstoqueBase):
+    id: int
+    codigo: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# -----------------------------------------------------------------------------
 # ESTOQUE POR LOCAL
 # -----------------------------------------------------------------------------
 
