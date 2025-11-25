@@ -39,3 +39,6 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+backend/.coverage
+backend/tests/__pycache__/
+backend/.pytest_cache/

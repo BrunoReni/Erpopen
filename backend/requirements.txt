@@ -6,3 +6,9 @@ python-jose[cryptography]
 pydantic>=2.0
 pydantic-settings
 email-validator
+
+# Test dependencies
+pytest
+pytest-asyncio
+pytest-cov
+httpx
