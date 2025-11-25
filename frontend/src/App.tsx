@@ -7,6 +7,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { ComprasIndex } from './modules/compras/ComprasIndex';
 import { FornecedoresList } from './modules/compras/FornecedoresList';
 import { PedidosCompraList } from './modules/compras/PedidosCompraList';
+import { CotacoesList } from './modules/compras/CotacoesList';
 import { FinanceiroIndex } from './modules/financeiro/FinanceiroIndex';
 import { ContasPagarList } from './modules/financeiro/ContasPagarList';
 import { ContasReceberList } from './modules/financeiro/ContasReceberList';
@@ -60,6 +61,15 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['compras:read']}>
                 <PedidosCompraList />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/compras/cotacoes"
+            element={
+              <ProtectedRoute requiredPermissions={['compras:read']}>
+                <CotacoesList />
               </ProtectedRoute>
             }
           />
