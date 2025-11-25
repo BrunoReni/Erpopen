@@ -1,14 +1,15 @@
-# 📊 PROGRESSO DA SESSÃO - 24/11/2025
+# 📊 PROGRESSO DA SESSÃO - 25/11/2025
 
 ## 🎯 RESUMO EXECUTIVO
 
-**Progresso Total: 40% Concluído (10h de 30h)**
+**Progresso Total: 50% Concluído (14h de 30h)**
 
-Foram completadas **4 sprints** com sucesso:
+Foram completadas **5 sprints** com sucesso:
 - ✅ SPRINT 1: Códigos Automáticos (2h)
 - ✅ SPRINT 2: API de Clientes (2h)
 - ✅ SPRINT 3: Frontend de Clientes (3h)
 - ✅ SPRINT 4: Saldo em Estoque (3h)
+- ✅ SPRINT 5: Cotações Backend (4h) ← NOVO!
 
 ---
 
@@ -99,11 +100,68 @@ Foram completadas **4 sprints** com sucesso:
 
 ---
 
+### 5️⃣ SPRINT 5: Cotações Backend
+**Implementado:**
+- 4 Models completos:
+  * Cotacao (tabela principal)
+  * ItemCotacao (itens da cotação)
+  * RespostaFornecedor (propostas dos fornecedores)
+  * ItemRespostaFornecedor (preços detalhados)
+
+- Enum StatusCotacao:
+  * RASCUNHO, ENVIADA, RESPONDIDA
+  * APROVADA, REJEITADA
+  * CONVERTIDA, CANCELADA
+
+- 9 Endpoints REST completos:
+  * GET /cotacoes - Listar com filtros
+  * POST /cotacoes - Criar nova
+  * GET /cotacoes/{id} - Buscar por ID
+  * PUT /cotacoes/{id} - Atualizar
+  * DELETE /cotacoes/{id} - Deletar
+  * POST /cotacoes/{id}/respostas - Adicionar resposta fornecedor
+  * GET /cotacoes/{id}/respostas - Listar respostas
+  * POST /cotacoes/{id}/selecionar-fornecedor/{resposta_id}
+  * GET /cotacoes/{id}/comparativo - Comparar fornecedores
+
+- Funcionalidade de conversão:
+  * POST /cotacoes/{id}/converter-pedido
+  * Converte cotação aprovada em Pedido de Compra
+  * Transfere todos os itens automaticamente
+  * Registra rastreabilidade
+
+- Cálculos automáticos:
+  * Valor total da resposta do fornecedor
+  * Preço total por item (quantidade × preço unitário)
+  * Comparação de preços entre fornecedores
+
+- Validações:
+  * Status válidos para cada operação
+  * Verificação de fornecedor selecionado
+  * Impede conversão duplicada
+  * Valida integridade dos dados
+
+- Seeds de dados:
+  * 3 cotações de exemplo
+  * 6 itens de cotação
+  * 2 respostas de fornecedores
+  * 3 fornecedores cadastrados
+
+**Commit:** `54684f7`
+
+**Teste:** 
+- ✅ Todas as 9 APIs testadas e funcionando
+- ✅ Comparativo de fornecedores OK
+- ✅ Conversão para pedido OK
+- ✅ Validações OK
+
+---
+
 ## 🗂️ REPOSITÓRIO GITHUB
 
 **URL:** https://github.com/BrunoReni/Erpopen
 
-**Commits enviados:** 7 commits
+**Commits enviados:** 8 commits (novo: Sprint 5)
 1. Initial commit
 2. FASE 1 - Estrutura de Dados
 3. SPRINT 1 - Códigos Automáticos
@@ -111,23 +169,25 @@ Foram completadas **4 sprints** com sucesso:
 5. SPRINT 3 - Frontend de Clientes
 6. README atualizado
 7. SPRINT 4 - Saldo em Estoque
+8. SPRINT 5 - Cotações Backend ← NOVO!
 
 ---
 
 ## 📦 SISTEMA ATUAL
 
 ### Backend (FastAPI)
-- ✅ 19 tabelas no banco de dados
+- ✅ 23 tabelas no banco de dados (+4 novas de cotações)
 - ✅ Sistema de autenticação (JWT + RBAC)
-- ✅ 4 módulos funcionando:
-  * Compras (Fornecedores, Pedidos)
+- ✅ 5 módulos funcionando:
+  * Compras (Fornecedores, Pedidos, **Cotações**) ← NOVO!
   * Financeiro (Contas, Bancos)
   * Materiais (Produtos, Estoque, Movimentações)
-  * Vendas (Clientes) ← NOVO!
-- ✅ Códigos automáticos
+  * Vendas (Clientes)
+- ✅ Códigos automáticos para todos os módulos
 - ✅ Validações CPF/CNPJ
 - ✅ Controle de estoque multi-local
 - ✅ APIs de saldo e relatórios
+- ✅ Sistema completo de cotações ← NOVO!
 
 **Rodando em:** http://localhost:8000  
 **Docs:** http://localhost:8000/docs
@@ -143,8 +203,7 @@ Foram completadas **4 sprints** com sucesso:
   * Pedidos de Compra
   * Contas a Pagar/Receber
   * Materiais
-  * Clientes ← NOVO!
-- ✅ Componentes reutilizáveis
+  * Clientes
 
 **Rodando em:** http://localhost:5173
 
@@ -154,22 +213,16 @@ Foram completadas **4 sprints** com sucesso:
 
 ---
 
-## 🎯 PRÓXIMAS SPRINTS (60% Restante - 20h)
+## 🎯 PRÓXIMAS SPRINTS (50% Restante - 16h)
 
-### SPRINT 5: Cotações Backend (4h)
-- Model Cotacao e ItensCotacao
-- Schemas Pydantic
-- 8 endpoints REST
-- Relacionamento com Fornecedores
-- Status da cotação
-- Conversão para Pedido de Compra
-
-### SPRINT 6: Cotações Frontend (4h)
-- Página de listagem
-- Formulário de cotação
-- Tabela de itens
-- Comparação de fornecedores
-- Ações (aprovar, rejeitar, converter)
+### SPRINT 6: Cotações Frontend (4h) ← PRÓXIMA
+- Página de listagem de cotações
+- Formulário de criação/edição
+- Tabela de itens dinâmica
+- Tela de respostas de fornecedores
+- Quadro comparativo visual
+- Ações: aprovar, rejeitar, converter
+- Indicadores visuais de status
 
 ### SPRINT 7: API de Armazéns (2h)
 - CRUD de locais de estoque
@@ -183,7 +236,7 @@ Foram completadas **4 sprints** com sucesso:
 - Visualização de estoque por local
 - Transferências entre locais
 
-### SPRINT 9: Faturamento Backend (5h)
+### SPRINT 9: Faturamento Backend (4h)
 - Model NotaFiscal e ItensNF
 - Schemas completos
 - Geração de NF a partir de Pedido
@@ -202,12 +255,12 @@ Foram completadas **4 sprints** com sucesso:
 
 ## 📈 ESTATÍSTICAS
 
-**Tempo Investido:** ~10 horas  
-**Commits:** 7 commits bem documentados  
-**Linhas de Código:** ~2.500 linhas  
-**APIs Criadas:** 15+ endpoints  
+**Tempo Investido:** ~14 horas  
+**Commits:** 8 commits bem documentados  
+**Linhas de Código:** ~3.500 linhas  
+**APIs Criadas:** 24+ endpoints  
 **Telas Funcionais:** 8 telas  
-**Tabelas no Banco:** 19 tabelas  
+**Tabelas no Banco:** 23 tabelas  
 
 ---
 
@@ -247,20 +300,24 @@ Login: admin@erp.com / admin123
 5. ✅ Sistema funcionando end-to-end
 6. ✅ Commits bem documentados
 7. ✅ Código limpo e organizado
+8. ✅ Sistema de cotações completo ← NOVO!
+9. ✅ Conversão de cotação para pedido ← NOVO!
+10. ✅ Comparativo de fornecedores ← NOVO!
 
 ---
 
 ## 🎉 CONQUISTAS
 
-- ✅ 40% do projeto concluído em 1 sessão
-- ✅ Sistema ERP funcional com 4 módulos
+- ✅ 50% do projeto concluído
+- ✅ Sistema ERP funcional com 5 módulos
 - ✅ Backend + Frontend integrados
 - ✅ Repositório público no GitHub
 - ✅ Documentação completa
+- ✅ Sistema de cotações empresarial ← NOVO!
 - ✅ Pronto para continuar desenvolvimento
 
 ---
 
-**Última atualização:** 24/11/2025 19:50h  
-**Próxima sessão:** SPRINT 5 - Cotações Backend (4h)
+**Última atualização:** 25/11/2025 15:50h  
+**Próxima sessão:** SPRINT 6 - Cotações Frontend (4h)
 
