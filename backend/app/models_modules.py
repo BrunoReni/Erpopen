@@ -263,6 +263,7 @@ class ContaReceber(Base):
     # ATUALIZADO: De String para FK
     cliente_nome = Column(String, nullable=True)  # Mantido para compatibilidade com dados antigos
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)  # Novo FK
+    pedido_venda_id = Column(Integer, ForeignKey("pedidos_venda.id"), nullable=True)  # Link com pedido de venda
     
     centro_custo_id = Column(Integer, ForeignKey("centros_custo.id"))
     data_emissao = Column(DateTime, default=datetime.utcnow)
@@ -282,6 +283,7 @@ class ContaReceber(Base):
     
     # Relacionamentos
     cliente = relationship("Cliente", back_populates="contas_receber")
+    pedido_venda = relationship("PedidoVenda", back_populates="contas_receber")
 
 
 # =============================================================================
@@ -398,6 +400,68 @@ class Cliente(Base):
     
     # Relacionamentos
     contas_receber = relationship("ContaReceber", back_populates="cliente")
+    pedidos_venda = relationship("PedidoVenda", back_populates="cliente")
+
+
+# -----------------------------------------------------------------------------
+# PEDIDOS DE VENDA
+# -----------------------------------------------------------------------------
+
+class PedidoVenda(Base):
+    __tablename__ = "pedidos_venda"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, unique=True, index=True)  # PV-0001, PV-0002...
+    
+    # Relacionamentos
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    vendedor_id = Column(Integer, nullable=True)  # ID do usuário vendedor
+    
+    # Datas
+    data_pedido = Column(DateTime, default=datetime.utcnow)
+    data_entrega_prevista = Column(DateTime, nullable=True)
+    data_faturamento = Column(DateTime, nullable=True)
+    
+    # Status e valores
+    status = Column(String, default="orcamento")  # orcamento, aprovado, faturado, cancelado
+    condicao_pagamento = Column(String, nullable=True)  # à vista, 30 dias, etc.
+    
+    # Valores (calculados)
+    valor_produtos = Column(Float, default=0.0)
+    valor_desconto = Column(Float, default=0.0)
+    valor_frete = Column(Float, default=0.0)
+    valor_total = Column(Float, default=0.0)
+    
+    observacoes = Column(Text, nullable=True)
+    
+    # Controle
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    cliente = relationship("Cliente", back_populates="pedidos_venda")
+    itens = relationship("ItemPedidoVenda", back_populates="pedido", cascade="all, delete-orphan")
+    contas_receber = relationship("ContaReceber", back_populates="pedido_venda")
+
+
+class ItemPedidoVenda(Base):
+    __tablename__ = "itens_pedido_venda"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    pedido_id = Column(Integer, ForeignKey("pedidos_venda.id"), nullable=False)
+    material_id = Column(Integer, ForeignKey("materiais.id"), nullable=False)
+    
+    quantidade = Column(Float, nullable=False)
+    preco_unitario = Column(Float, nullable=False)
+    percentual_desconto = Column(Float, default=0.0)
+    valor_desconto = Column(Float, default=0.0)
+    subtotal = Column(Float, nullable=False)  # (quantidade * preco_unitario) - desconto
+    
+    observacao = Column(String, nullable=True)
+    
+    # Relacionamentos
+    pedido = relationship("PedidoVenda", back_populates="itens")
+    material = relationship("Material")
 
 
 # -----------------------------------------------------------------------------
