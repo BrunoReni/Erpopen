@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint, Date, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -58,6 +58,17 @@ class TipoNotaFiscal(str, enum.Enum):
     SAIDA = "saida"  # Venda
     ENTRADA = "entrada"  # Compra
     DEVOLUCAO = "devolucao"
+
+
+class TipoMovimentacaoBancaria(str, enum.Enum):
+    DEPOSITO = "deposito"
+    SAQUE = "saque"
+    TARIFA = "tarifa"
+    TRANSFERENCIA_ENTRADA = "transferencia_entrada"
+    TRANSFERENCIA_SAIDA = "transferencia_saida"
+    JUROS = "juros"
+    ESTORNO = "estorno"
+    OUTROS = "outros"
 
 
 # =============================================================================
@@ -212,9 +223,53 @@ class ContaBancaria(Base):
     agencia = Column(String)
     conta = Column(String)
     saldo_inicial = Column(Float, default=0.0)
+    data_saldo_inicial = Column(Date, nullable=True)
     saldo_atual = Column(Float, default=0.0)
     ativa = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    saldos_diarios = relationship("SaldoDiario", back_populates="conta_bancaria")
+    movimentacoes = relationship("MovimentacaoBancaria", back_populates="conta_bancaria")
+
+
+class SaldoDiario(Base):
+    __tablename__ = "saldos_diarios"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conta_bancaria_id = Column(Integer, ForeignKey("contas_bancarias.id"), nullable=False)
+    data = Column(Date, nullable=False)
+    saldo_anterior = Column(Float, default=0.0)
+    total_entradas = Column(Float, default=0.0)
+    total_saidas = Column(Float, default=0.0)
+    saldo_final = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relacionamento
+    conta_bancaria = relationship("ContaBancaria", back_populates="saldos_diarios")
+
+
+class MovimentacaoBancaria(Base):
+    __tablename__ = "movimentacoes_bancarias"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conta_bancaria_id = Column(Integer, ForeignKey("contas_bancarias.id"), nullable=False)
+    tipo = Column(SQLEnum(TipoMovimentacaoBancaria), nullable=False)
+    natureza = Column(String, nullable=False)  # ENTRADA ou SAIDA
+    data_movimentacao = Column(DateTime, default=datetime.utcnow)
+    data_competencia = Column(Date)
+    valor = Column(Float, nullable=False)
+    descricao = Column(String, nullable=False)
+    conta_pagar_id = Column(Integer, ForeignKey("contas_pagar.id"), nullable=True)
+    conta_receber_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=True)
+    transferencia_vinculada_id = Column(Integer, nullable=True)
+    conciliado = Column(Boolean, default=False)
+    data_conciliacao = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamento
+    conta_bancaria = relationship("ContaBancaria", back_populates="movimentacoes")
 
 
 class CentroCusto(Base):
