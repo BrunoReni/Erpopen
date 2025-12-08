@@ -10,6 +10,7 @@ interface ContaBancaria {
   agencia: string;
   conta: string;
   saldo_inicial: number;
+  data_saldo_inicial?: string;
 }
 
 interface ContaBancariaFormProps {
@@ -24,7 +25,8 @@ export function ContaBancariaForm({ conta, onClose, onSave }: ContaBancariaFormP
     banco: '',
     agencia: '',
     conta: '',
-    saldo_inicial: 0
+    saldo_inicial: 0,
+    data_saldo_inicial: new Date().toISOString().slice(0, 10)
   });
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +37,10 @@ export function ContaBancariaForm({ conta, onClose, onSave }: ContaBancariaFormP
         banco: conta.banco || '',
         agencia: conta.agencia || '',
         conta: conta.conta || '',
-        saldo_inicial: conta.saldo_inicial || 0
+        saldo_inicial: conta.saldo_inicial || 0,
+        data_saldo_inicial: conta.data_saldo_inicial 
+          ? new Date(conta.data_saldo_inicial).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10)
       });
     }
   }, [conta]);
@@ -145,11 +150,24 @@ export function ContaBancariaForm({ conta, onClose, onSave }: ContaBancariaFormP
                   type="number"
                   required
                   step="0.01"
+                  min="0"
                   value={formData.saldo_inicial}
                   onChange={(e) => setFormData({ ...formData, saldo_inicial: parseFloat(e.target.value) })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data do Saldo Inicial
+              </label>
+              <input
+                type="date"
+                value={formData.data_saldo_inicial}
+                onChange={(e) => setFormData({ ...formData, data_saldo_inicial: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
 
             <div className="flex justify-end gap-4 pt-6 border-t">

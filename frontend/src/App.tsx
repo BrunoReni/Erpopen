@@ -13,6 +13,9 @@ import { ContasPagarList } from './modules/financeiro/ContasPagarList';
 import { ContasReceberList } from './modules/financeiro/ContasReceberList';
 import { ContasBancariasList } from './modules/financeiro/ContasBancariasList';
 import { CentrosCustoList } from './modules/financeiro/CentrosCustoList';
+import { MovimentacoesBancariasList } from './modules/financeiro/MovimentacoesBancariasList';
+import { TransferenciaForm } from './modules/financeiro/TransferenciaForm';
+import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
 import { MateriaisIndex } from './modules/materiais/MateriaisIndex';
 import { VendasIndex } from './modules/vendas/VendasIndex';
 import { ClientesList } from './modules/vendas/ClientesList';
@@ -120,6 +123,33 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['financeiro:read']}>
                 <CentrosCustoList />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/financeiro/movimentacoes"
+            element={
+              <ProtectedRoute requiredPermissions={['financeiro:read']}>
+                <MovimentacoesBancariasList />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/financeiro/transferencias"
+            element={
+              <ProtectedRoute requiredPermissions={['financeiro:create']}>
+                <TransferenciaForm />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/financeiro/conciliacao"
+            element={
+              <ProtectedRoute requiredPermissions={['financeiro:read']}>
+                <ConciliacaoBancaria />
               </ProtectedRoute>
             }
           />

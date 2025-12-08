@@ -1,6 +1,6 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Link } from 'react-router-dom';
-import { DollarSign, CreditCard, Building2, Target } from 'lucide-react';
+import { DollarSign, CreditCard, Building2, Target, ArrowLeftRight, Receipt, CheckSquare } from 'lucide-react';
 
 export function FinanceiroIndex() {
   const modules = [
@@ -31,6 +31,27 @@ export function FinanceiroIndex() {
       icon: Target,
       path: '/financeiro/centros-custo',
       color: 'bg-purple-500'
+    },
+    {
+      title: 'Movimentações Bancárias',
+      description: 'Entradas e saídas bancárias',
+      icon: Receipt,
+      path: '/financeiro/movimentacoes',
+      color: 'bg-indigo-500'
+    },
+    {
+      title: 'Transferências',
+      description: 'Transferência entre contas',
+      icon: ArrowLeftRight,
+      path: '/financeiro/transferencias',
+      color: 'bg-cyan-500'
+    },
+    {
+      title: 'Conciliação Bancária',
+      description: 'Conciliar com extrato',
+      icon: CheckSquare,
+      path: '/financeiro/conciliacao',
+      color: 'bg-teal-500'
     }
   ];
 

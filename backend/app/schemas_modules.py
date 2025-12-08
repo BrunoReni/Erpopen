@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 
 
@@ -53,6 +53,17 @@ class TipoNotaFiscal(str, Enum):
     SAIDA = "saida"
     ENTRADA = "entrada"
     DEVOLUCAO = "devolucao"
+
+
+class TipoMovimentacaoBancaria(str, Enum):
+    DEPOSITO = "deposito"
+    SAQUE = "saque"
+    TARIFA = "tarifa"
+    TRANSFERENCIA_ENTRADA = "transferencia_entrada"
+    TRANSFERENCIA_SAIDA = "transferencia_saida"
+    JUROS = "juros"
+    ESTORNO = "estorno"
+    OUTROS = "outros"
 
 
 class StatusPedidoVenda(str, Enum):
@@ -169,10 +180,16 @@ class ContaBancariaBase(BaseModel):
     agencia: Optional[str] = None
     conta: Optional[str] = None
     saldo_inicial: float = 0.0
+    data_saldo_inicial: Optional[date] = None
 
 
 class ContaBancariaCreate(ContaBancariaBase):
-    pass
+    @field_validator('saldo_inicial')
+    @classmethod
+    def saldo_nao_negativo(cls, v):
+        if v < 0:
+            raise ValueError('Saldo inicial não pode ser negativo')
+        return v
 
 
 class ContaBancariaRead(ContaBancariaBase):
@@ -183,6 +200,92 @@ class ContaBancariaRead(ContaBancariaBase):
     
     class Config:
         from_attributes = True
+
+
+# Saldo Diário
+class SaldoDiarioBase(BaseModel):
+    conta_bancaria_id: int
+    data: date
+    saldo_anterior: float = 0.0
+    total_entradas: float = 0.0
+    total_saidas: float = 0.0
+    saldo_final: float = 0.0
+
+
+class SaldoDiarioRead(SaldoDiarioBase):
+    id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Movimentação Bancária
+class MovimentacaoBancariaBase(BaseModel):
+    conta_bancaria_id: int
+    tipo: TipoMovimentacaoBancaria
+    natureza: str  # ENTRADA ou SAIDA
+    valor: float
+    descricao: str
+    data_movimentacao: Optional[datetime] = None
+    data_competencia: Optional[date] = None
+    conta_pagar_id: Optional[int] = None
+    conta_receber_id: Optional[int] = None
+    transferencia_vinculada_id: Optional[int] = None
+
+
+class MovimentacaoBancariaCreate(MovimentacaoBancariaBase):
+    @field_validator('valor')
+    @classmethod
+    def valor_positivo(cls, v):
+        if v <= 0:
+            raise ValueError('Valor deve ser positivo')
+        return v
+    
+    @field_validator('natureza')
+    @classmethod
+    def natureza_valida(cls, v):
+        if v not in ['ENTRADA', 'SAIDA']:
+            raise ValueError('Natureza deve ser ENTRADA ou SAIDA')
+        return v
+
+
+class MovimentacaoBancariaUpdate(BaseModel):
+    tipo: Optional[TipoMovimentacaoBancaria] = None
+    natureza: Optional[str] = None
+    valor: Optional[float] = None
+    descricao: Optional[str] = None
+    data_movimentacao: Optional[datetime] = None
+    data_competencia: Optional[date] = None
+    conta_pagar_id: Optional[int] = None
+    conta_receber_id: Optional[int] = None
+
+
+class MovimentacaoBancariaRead(MovimentacaoBancariaBase):
+    id: int
+    conciliado: bool
+    data_conciliacao: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Transferência entre contas
+class TransferenciaCreate(BaseModel):
+    conta_origem_id: int
+    conta_destino_id: int
+    valor: float
+    data: datetime
+    descricao: str
+    
+    @field_validator('valor')
+    @classmethod
+    def valor_positivo(cls, v):
+        if v <= 0:
+            raise ValueError('Valor deve ser positivo')
+        return v
 
 
 # Centro de Custo
