@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ArrowUpCircle, ArrowDownCircle, Filter } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowUpCircle, ArrowDownCircle, Filter, DollarSign } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { MovimentacaoBancariaForm } from './MovimentacaoBancariaForm';
 import api from '../../services/api';
