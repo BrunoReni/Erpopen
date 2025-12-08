@@ -46,6 +46,20 @@ class StatusCotacao(str, enum.Enum):
     CANCELADA = "cancelada"
 
 
+class StatusNotaFiscal(str, enum.Enum):
+    RASCUNHO = "rascunho"
+    EMITIDA = "emitida"
+    AUTORIZADA = "autorizada"
+    CANCELADA = "cancelada"
+    DENEGADA = "denegada"
+
+
+class TipoNotaFiscal(str, enum.Enum):
+    SAIDA = "saida"  # Venda
+    ENTRADA = "entrada"  # Compra
+    DEVOLUCAO = "devolucao"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS
 # =============================================================================
@@ -465,3 +479,103 @@ class EstoquePorLocal(Base):
     __table_args__ = (
         UniqueConstraint('material_id', 'local_id', name='uk_material_local'),
     )
+
+
+# =============================================================================
+# MÓDULO DE FATURAMENTO / NOTAS FISCAIS
+# =============================================================================
+
+class NotaFiscal(Base):
+    __tablename__ = "notas_fiscais"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(String, unique=True, index=True)  # Número da NF
+    serie = Column(String, default="1")
+    tipo = Column(SQLEnum(TipoNotaFiscal), default=TipoNotaFiscal.SAIDA)
+    
+    # Datas
+    data_emissao = Column(DateTime, default=datetime.utcnow)
+    data_saida = Column(DateTime)
+    
+    # Relacionamentos
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"), nullable=True)
+    pedido_venda_id = Column(Integer, nullable=True)  # Relacionamento opcional com pedido
+    pedido_compra_id = Column(Integer, nullable=True)
+    
+    # Valores
+    valor_produtos = Column(Float, default=0.0)
+    valor_frete = Column(Float, default=0.0)
+    valor_seguro = Column(Float, default=0.0)
+    valor_desconto = Column(Float, default=0.0)
+    valor_outras_despesas = Column(Float, default=0.0)
+    
+    # Impostos (simplificado para MVP)
+    valor_icms = Column(Float, default=0.0)
+    valor_ipi = Column(Float, default=0.0)
+    valor_pis = Column(Float, default=0.0)
+    valor_cofins = Column(Float, default=0.0)
+    
+    # Total
+    valor_total = Column(Float, default=0.0)
+    
+    # Fiscal
+    chave_acesso = Column(String)  # Chave de 44 dígitos (NFe)
+    protocolo_autorizacao = Column(String)
+    
+    # Natureza da operação
+    natureza_operacao = Column(String, default="Venda de mercadoria")
+    cfop = Column(String)  # Código Fiscal de Operações
+    
+    # Observações
+    observacao = Column(Text)
+    informacoes_adicionais = Column(Text)
+    
+    # Controle
+    status = Column(SQLEnum(StatusNotaFiscal), default=StatusNotaFiscal.RASCUNHO)
+    usuario_emissao_id = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    cliente = relationship("Cliente")
+    fornecedor = relationship("Fornecedor")
+    itens = relationship("ItemNotaFiscal", back_populates="nota_fiscal", cascade="all, delete-orphan")
+
+
+class ItemNotaFiscal(Base):
+    __tablename__ = "itens_nota_fiscal"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nota_fiscal_id = Column(Integer, ForeignKey("notas_fiscais.id"), nullable=False)
+    material_id = Column(Integer, ForeignKey("materiais.id"), nullable=True)
+    
+    # Dados do produto
+    codigo_produto = Column(String)
+    descricao = Column(String, nullable=False)
+    ncm = Column(String)  # Nomenclatura Comum do Mercosul
+    unidade = Column(String)
+    
+    # Quantidades e valores
+    quantidade = Column(Float, nullable=False)
+    valor_unitario = Column(Float, nullable=False)
+    valor_desconto = Column(Float, default=0.0)
+    valor_frete = Column(Float, default=0.0)
+    valor_seguro = Column(Float, default=0.0)
+    valor_outras_despesas = Column(Float, default=0.0)
+    
+    # Impostos (simplificado)
+    aliquota_icms = Column(Float, default=0.0)
+    valor_icms = Column(Float, default=0.0)
+    aliquota_ipi = Column(Float, default=0.0)
+    valor_ipi = Column(Float, default=0.0)
+    
+    # Total
+    valor_total = Column(Float, nullable=False)
+    
+    # CFOP por item (pode ser diferente)
+    cfop = Column(String)
+    
+    # Relacionamentos
+    nota_fiscal = relationship("NotaFiscal", back_populates="itens")
+    material = relationship("Material")

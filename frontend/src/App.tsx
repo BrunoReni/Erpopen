@@ -18,6 +18,8 @@ import { VendasIndex } from './modules/vendas/VendasIndex';
 import { ClientesList } from './modules/vendas/ClientesList';
 import { MateriaisList } from './modules/materiais/MateriaisList';
 import { MovimentosEstoqueList } from './modules/materiais/MovimentosEstoqueList';
+import LocaisEstoqueList from './modules/materiais/LocaisEstoqueList';
+import NotasFiscaisList from './modules/vendas/NotasFiscaisList';
 import { UsersList } from './modules/users/UsersList';
 import './App.css';
 
@@ -148,6 +150,15 @@ function App() {
             }
           />
           
+          <Route
+            path="/materiais/locais"
+            element={
+              <ProtectedRoute requiredPermissions={['materiais:read']}>
+                <LocaisEstoqueList />
+              </ProtectedRoute>
+            }
+          />
+          
           {/* Vendas/Comercial */}
           <Route
             path="/vendas"
@@ -163,6 +174,15 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['vendas:read']}>
                 <ClientesList />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/vendas/notas-fiscais"
+            element={
+              <ProtectedRoute requiredPermissions={['vendas:read']}>
+                <NotasFiscaisList />
               </ProtectedRoute>
             }
           />

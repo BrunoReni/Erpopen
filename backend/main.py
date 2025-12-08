@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import auth, compras, financeiro, materiais, vendas, cotacoes, locais
+from app.routes import auth, compras, financeiro, materiais, vendas, cotacoes, locais, faturamento
 from app.db import init_db
 from app.core.config import settings
 
@@ -37,6 +37,7 @@ app.include_router(financeiro.router, prefix="/financeiro", tags=["financeiro"])
 app.include_router(materiais.router, prefix="/materiais", tags=["materiais"])
 app.include_router(locais.router, prefix="/locais", tags=["locais"])
 app.include_router(vendas.router, prefix="/vendas", tags=["vendas"])
+app.include_router(faturamento.router, prefix="/faturamento", tags=["faturamento"])
 
 
 @app.get("/")
@@ -45,6 +46,6 @@ def root():
         "status": "ok",
         "service": "ERP Open Backend",
         "version": "1.0.0",
-        "modules": ["auth", "compras", "cotacoes", "financeiro", "materiais", "locais", "vendas"],
+        "modules": ["auth", "compras", "cotacoes", "financeiro", "materiais", "locais", "vendas", "faturamento"],
         "docs": "/docs"
     }

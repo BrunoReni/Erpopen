@@ -1,6 +1,6 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Link } from 'react-router-dom';
-import { Package, List, TrendingDown, BarChart3 } from 'lucide-react';
+import { Package, List, TrendingDown, BarChart3, Warehouse } from 'lucide-react';
 
 export function MateriaisIndex() {
   const modules = [
@@ -10,6 +10,13 @@ export function MateriaisIndex() {
       icon: Package,
       path: '/materiais/produtos',
       color: 'bg-blue-500'
+    },
+    {
+      title: 'Locais de Estoque',
+      description: 'Armazéns e depósitos',
+      icon: Warehouse,
+      path: '/materiais/locais',
+      color: 'bg-indigo-500'
     },
     {
       title: 'Categorias',

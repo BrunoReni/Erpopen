@@ -14,18 +14,17 @@ export function VendasIndex() {
       color: 'green'
     },
     {
-      title: 'Pedidos de Venda',
-      description: 'Criar e gerenciar pedidos de venda',
+      title: 'Notas Fiscais',
+      description: 'Emissão e gestão de notas fiscais',
       icon: FileText,
-      path: '/vendas/pedidos',
-      color: 'blue',
-      disabled: true
+      path: '/vendas/notas-fiscais',
+      color: 'blue'
     },
     {
-      title: 'Faturamento',
-      description: 'Gerar notas fiscais e faturar pedidos',
+      title: 'Pedidos de Venda',
+      description: 'Criar e gerenciar pedidos de venda',
       icon: TrendingUp,
-      path: '/vendas/faturamento',
+      path: '/vendas/pedidos',
       color: 'purple',
       disabled: true
     }
@@ -81,8 +80,8 @@ export function VendasIndex() {
           <h4 className="font-semibold text-blue-900 mb-2">📋 Módulos Disponíveis</h4>
           <ul className="text-sm text-blue-800 space-y-1">
             <li>✅ <strong>Clientes</strong> - Cadastro completo com código automático (CLI-XXXX)</li>
+            <li>✅ <strong>Notas Fiscais</strong> - Emissão de NF com baixa automática de estoque</li>
             <li>⏳ <strong>Pedidos de Venda</strong> - Em desenvolvimento</li>
-            <li>⏳ <strong>Faturamento</strong> - Em desenvolvimento</li>
           </ul>
         </div>
       </div>

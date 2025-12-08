@@ -41,6 +41,20 @@ class StatusCotacao(str, Enum):
     CANCELADA = "cancelada"
 
 
+class StatusNotaFiscal(str, Enum):
+    RASCUNHO = "rascunho"
+    EMITIDA = "emitida"
+    AUTORIZADA = "autorizada"
+    CANCELADA = "cancelada"
+    DENEGADA = "denegada"
+
+
+class TipoNotaFiscal(str, Enum):
+    SAIDA = "saida"
+    ENTRADA = "entrada"
+    DEVOLUCAO = "devolucao"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS - SCHEMAS
 # =============================================================================
@@ -644,6 +658,104 @@ class CotacaoRead(CotacaoBase):
     updated_at: datetime
     itens: List[ItemCotacaoRead] = []
     respostas: List[RespostaFornecedorRead] = []
+    
+    class Config:
+        from_attributes = True
+
+
+# =============================================================================
+# MÓDULO DE FATURAMENTO / NOTAS FISCAIS - SCHEMAS
+# =============================================================================
+
+# Item Nota Fiscal
+class ItemNotaFiscalBase(BaseModel):
+    material_id: Optional[int] = None
+    codigo_produto: Optional[str] = None
+    descricao: str
+    ncm: Optional[str] = None
+    unidade: str
+    quantidade: float
+    valor_unitario: float
+    valor_desconto: float = 0.0
+    valor_frete: float = 0.0
+    valor_seguro: float = 0.0
+    valor_outras_despesas: float = 0.0
+    aliquota_icms: float = 0.0
+    valor_icms: float = 0.0
+    aliquota_ipi: float = 0.0
+    valor_ipi: float = 0.0
+    cfop: Optional[str] = None
+
+
+class ItemNotaFiscalCreate(ItemNotaFiscalBase):
+    pass
+
+
+class ItemNotaFiscalRead(ItemNotaFiscalBase):
+    id: int
+    nota_fiscal_id: int
+    valor_total: float
+    
+    class Config:
+        from_attributes = True
+
+
+# Nota Fiscal
+class NotaFiscalBase(BaseModel):
+    numero: Optional[str] = None
+    serie: str = "1"
+    tipo: TipoNotaFiscal = TipoNotaFiscal.SAIDA
+    data_emissao: Optional[datetime] = None
+    data_saida: Optional[datetime] = None
+    cliente_id: Optional[int] = None
+    fornecedor_id: Optional[int] = None
+    pedido_venda_id: Optional[int] = None
+    pedido_compra_id: Optional[int] = None
+    valor_frete: float = 0.0
+    valor_seguro: float = 0.0
+    valor_desconto: float = 0.0
+    valor_outras_despesas: float = 0.0
+    natureza_operacao: str = "Venda de mercadoria"
+    cfop: Optional[str] = None
+    observacao: Optional[str] = None
+    informacoes_adicionais: Optional[str] = None
+
+
+class NotaFiscalCreate(NotaFiscalBase):
+    itens: List[ItemNotaFiscalCreate]
+
+
+class NotaFiscalUpdate(BaseModel):
+    numero: Optional[str] = None
+    serie: Optional[str] = None
+    data_emissao: Optional[datetime] = None
+    data_saida: Optional[datetime] = None
+    valor_frete: Optional[float] = None
+    valor_seguro: Optional[float] = None
+    valor_desconto: Optional[float] = None
+    valor_outras_despesas: Optional[float] = None
+    natureza_operacao: Optional[str] = None
+    cfop: Optional[str] = None
+    observacao: Optional[str] = None
+    informacoes_adicionais: Optional[str] = None
+    status: Optional[StatusNotaFiscal] = None
+
+
+class NotaFiscalRead(NotaFiscalBase):
+    id: int
+    valor_produtos: float
+    valor_icms: float
+    valor_ipi: float
+    valor_pis: float
+    valor_cofins: float
+    valor_total: float
+    chave_acesso: Optional[str] = None
+    protocolo_autorizacao: Optional[str] = None
+    status: StatusNotaFiscal
+    usuario_emissao_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    itens: List[ItemNotaFiscalRead] = []
     
     class Config:
         from_attributes = True
