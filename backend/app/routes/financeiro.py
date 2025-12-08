@@ -5,7 +5,7 @@ from datetime import datetime, date
 from app.db import get_session
 from app.dependencies import require_permission
 from app.schemas_modules import (
-    ContaBancariaCreate, ContaBancariaRead,
+    ContaBancariaCreate, ContaBancariaRead, ContaBancariaUpdate,
     CentroCustoCreate, CentroCustoRead,
     ContaPagarCreate, ContaPagarRead, ContaPagarUpdate,
     ContaReceberCreate, ContaReceberRead, ContaReceberUpdate,
@@ -45,6 +45,56 @@ def create_conta_bancaria(
     session.commit()
     session.refresh(db_conta)
     return db_conta
+
+
+@router.get("/contas-bancarias/{conta_id}", response_model=ContaBancariaRead)
+def get_conta_bancaria(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Busca uma conta bancária por ID"""
+    conta = session.query(ContaBancaria).filter(ContaBancaria.id == conta_id).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
+    return conta
+
+
+@router.put("/contas-bancarias/{conta_id}", response_model=ContaBancariaRead)
+def update_conta_bancaria(
+    conta_id: int,
+    conta_update: ContaBancariaUpdate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Atualiza uma conta bancária"""
+    db_conta = session.query(ContaBancaria).filter(ContaBancaria.id == conta_id).first()
+    if not db_conta:
+        raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
+    
+    update_data = conta_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_conta, key, value)
+    
+    session.commit()
+    session.refresh(db_conta)
+    return db_conta
+
+
+@router.delete("/contas-bancarias/{conta_id}")
+def delete_conta_bancaria(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:delete"))
+):
+    """Desativa uma conta bancária"""
+    db_conta = session.query(ContaBancaria).filter(ContaBancaria.id == conta_id).first()
+    if not db_conta:
+        raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
+    
+    db_conta.ativa = 0
+    session.commit()
+    return {"message": "Conta bancária desativada com sucesso"}
 
 
 @router.get("/contas-bancarias/{conta_id}/saldo-diario")

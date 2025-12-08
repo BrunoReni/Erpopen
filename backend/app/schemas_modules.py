@@ -192,6 +192,14 @@ class ContaBancariaCreate(ContaBancariaBase):
         return v
 
 
+class ContaBancariaUpdate(BaseModel):
+    nome: Optional[str] = None
+    banco: Optional[str] = None
+    agencia: Optional[str] = None
+    conta: Optional[str] = None
+    ativa: Optional[int] = None
+
+
 class ContaBancariaRead(ContaBancariaBase):
     id: int
     saldo_atual: float
@@ -344,7 +352,7 @@ class ContaPagarRead(ContaPagarBase):
 # Conta a Receber
 class ContaReceberBase(BaseModel):
     descricao: str
-    cliente: str
+    cliente_id: int
     centro_custo_id: Optional[int] = None
     data_vencimento: datetime
     valor_original: float
@@ -364,6 +372,7 @@ class ContaReceberUpdate(BaseModel):
 
 class ContaReceberRead(ContaReceberBase):
     id: int
+    cliente_nome: Optional[str] = None
     data_emissao: datetime
     data_recebimento: Optional[datetime]
     valor_recebido: float
