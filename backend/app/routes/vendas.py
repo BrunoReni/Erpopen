@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.db import get_session
 from app.models_modules import Cliente, PedidoVenda, ItemPedidoVenda, Material, ContaReceber, MovimentoEstoque, LocalEstoque, TipoMovimento
 from app.schemas_modules import (
@@ -305,7 +305,7 @@ def atualizar_pedido_venda(
         )
     
     # Atualizar campos
-    update_data = pedido_data.dict(exclude_unset=True)
+    update_data = pedido_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(pedido, key, value)
     
@@ -412,7 +412,7 @@ def atualizar_item_pedido(
     pedido.valor_desconto -= item.valor_desconto
     
     # Atualizar item
-    update_data = item_data.dict(exclude_unset=True)
+    update_data = item_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(item, key, value)
     
@@ -561,7 +561,6 @@ def faturar_pedido_venda(pedido_id: int, db: Session = Depends(get_session)):
         data_vencimento = datetime.utcnow()
         
         # Calcular data de vencimento baseado nos dias do cliente
-        from datetime import timedelta
         data_vencimento = data_vencimento + timedelta(days=cliente.dias_vencimento)
         
         conta_receber = ContaReceber(

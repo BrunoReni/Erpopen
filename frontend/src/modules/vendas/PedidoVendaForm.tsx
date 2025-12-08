@@ -294,7 +294,7 @@ export function PedidoVendaForm() {
                 </label>
                 <select
                   value={formData.cliente_id}
-                  onChange={(e) => setFormData({ ...formData, cliente_id: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, cliente_id: parseInt(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border rounded-lg"
                   required
                 >

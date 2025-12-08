@@ -42,3 +42,10 @@ temp/
 backend/.coverage
 backend/tests/__pycache__/
 backend/.pytest_cache/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
