@@ -55,6 +55,13 @@ class TipoNotaFiscal(str, Enum):
     DEVOLUCAO = "devolucao"
 
 
+class StatusPedidoVenda(str, Enum):
+    ORCAMENTO = "orcamento"
+    APROVADO = "aprovado"
+    FATURADO = "faturado"
+    CANCELADO = "cancelado"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS - SCHEMAS
 # =============================================================================
@@ -409,6 +416,82 @@ class ClienteRead(ClienteBase):
     
     class Config:
         from_attributes = True
+
+
+# -----------------------------------------------------------------------------
+# PEDIDOS DE VENDA
+# -----------------------------------------------------------------------------
+
+# Item Pedido Venda
+class ItemPedidoVendaBase(BaseModel):
+    material_id: int
+    quantidade: float
+    preco_unitario: float
+    percentual_desconto: float = 0.0
+    observacao: Optional[str] = None
+
+
+class ItemPedidoVendaCreate(ItemPedidoVendaBase):
+    pass
+
+
+class ItemPedidoVendaUpdate(BaseModel):
+    quantidade: Optional[float] = None
+    preco_unitario: Optional[float] = None
+    percentual_desconto: Optional[float] = None
+    observacao: Optional[str] = None
+
+
+class ItemPedidoVendaRead(ItemPedidoVendaBase):
+    id: int
+    pedido_id: int
+    valor_desconto: float
+    subtotal: float
+    
+    class Config:
+        from_attributes = True
+
+
+# Pedido Venda
+class PedidoVendaBase(BaseModel):
+    cliente_id: int
+    vendedor_id: Optional[int] = None
+    data_entrega_prevista: Optional[datetime] = None
+    condicao_pagamento: Optional[str] = None
+    valor_frete: float = 0.0
+    observacoes: Optional[str] = None
+
+
+class PedidoVendaCreate(PedidoVendaBase):
+    itens: List[ItemPedidoVendaCreate]
+
+
+class PedidoVendaUpdate(BaseModel):
+    cliente_id: Optional[int] = None
+    vendedor_id: Optional[int] = None
+    data_entrega_prevista: Optional[datetime] = None
+    condicao_pagamento: Optional[str] = None
+    valor_frete: Optional[float] = None
+    observacoes: Optional[str] = None
+    status: Optional[StatusPedidoVenda] = None
+
+
+class PedidoVendaRead(PedidoVendaBase):
+    id: int
+    codigo: str
+    data_pedido: datetime
+    data_faturamento: Optional[datetime] = None
+    status: str
+    valor_produtos: float
+    valor_desconto: float
+    valor_total: float
+    created_at: datetime
+    updated_at: datetime
+    itens: List[ItemPedidoVendaRead] = []
+    
+    class Config:
+        from_attributes = True
+
 
 
 # -----------------------------------------------------------------------------

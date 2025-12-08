@@ -16,6 +16,8 @@ import { CentrosCustoList } from './modules/financeiro/CentrosCustoList';
 import { MateriaisIndex } from './modules/materiais/MateriaisIndex';
 import { VendasIndex } from './modules/vendas/VendasIndex';
 import { ClientesList } from './modules/vendas/ClientesList';
+import { PedidosVendaList } from './modules/vendas/PedidosVendaList';
+import { PedidoVendaForm } from './modules/vendas/PedidoVendaForm';
 import { MateriaisList } from './modules/materiais/MateriaisList';
 import { MovimentosEstoqueList } from './modules/materiais/MovimentosEstoqueList';
 import LocaisEstoqueList from './modules/materiais/LocaisEstoqueList';
@@ -174,6 +176,42 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['vendas:read']}>
                 <ClientesList />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/vendas/pedidos"
+            element={
+              <ProtectedRoute requiredPermissions={['vendas:read']}>
+                <PedidosVendaList />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/vendas/pedidos/novo"
+            element={
+              <ProtectedRoute requiredPermissions={['vendas:create']}>
+                <PedidoVendaForm />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/vendas/pedidos/:id"
+            element={
+              <ProtectedRoute requiredPermissions={['vendas:read']}>
+                <PedidoVendaForm />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/vendas/pedidos/:id/editar"
+            element={
+              <ProtectedRoute requiredPermissions={['vendas:update']}>
+                <PedidoVendaForm />
               </ProtectedRoute>
             }
           />

@@ -79,6 +79,28 @@ def gerar_codigo_cliente(db: Session) -> str:
     return f"CLI-{num:04d}"
 
 
+def gerar_codigo_pedido_venda(db: Session) -> str:
+    """
+    Gera código automático sequencial para pedido de venda
+    Formato: PV-0001, PV-0002, etc
+    """
+    from app.models_modules import PedidoVenda
+    
+    ultimo = db.query(PedidoVenda).filter(
+        PedidoVenda.codigo.isnot(None)
+    ).order_by(PedidoVenda.id.desc()).first()
+    
+    if ultimo and ultimo.codigo:
+        try:
+            num = int(ultimo.codigo.split('-')[1]) + 1
+        except (IndexError, ValueError):
+            num = 1
+    else:
+        num = 1
+    
+    return f"PV-{num:04d}"
+
+
 def gerar_codigo_material(db: Session) -> str:
     """
     Gera código automático sequencial para material

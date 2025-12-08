@@ -26,7 +26,7 @@ export function VendasIndex() {
       icon: TrendingUp,
       path: '/vendas/pedidos',
       color: 'purple',
-      disabled: true
+      disabled: false
     }
   ];
 
@@ -81,7 +81,7 @@ export function VendasIndex() {
           <ul className="text-sm text-blue-800 space-y-1">
             <li>✅ <strong>Clientes</strong> - Cadastro completo com código automático (CLI-XXXX)</li>
             <li>✅ <strong>Notas Fiscais</strong> - Emissão de NF com baixa automática de estoque</li>
-            <li>⏳ <strong>Pedidos de Venda</strong> - Em desenvolvimento</li>
+            <li>✅ <strong>Pedidos de Venda</strong> - Gestão completa de pedidos com integração financeira</li>
           </ul>
         </div>
       </div>
