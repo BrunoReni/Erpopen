@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from app.db import get_session
 from app.dependencies import require_permission
 from app.schemas_modules import (
@@ -11,12 +11,18 @@ from app.schemas_modules import (
     ContaReceberCreate, ContaReceberRead, ContaReceberUpdate,
     MovimentacaoBancariaCreate, MovimentacaoBancariaRead, MovimentacaoBancariaUpdate,
     SaldoDiarioRead, TransferenciaCreate,
-    BaixaContaPagar, BaixaContaReceber
+    BaixaContaPagar, BaixaContaReceber,
+    ParcelaContaPagarCreate, ParcelaContaPagarRead, ParcelaContaPagarUpdate,
+    ParcelaContaReceberCreate, ParcelaContaReceberRead, ParcelaContaReceberUpdate,
+    ContaPagarParceladaCreate, ContaReceberParceladaCreate,
+    ContaRecorrenteCreate, ContaRecorrenteRead, ContaRecorrenteUpdate,
+    CategoriaFinanceiraCreate, CategoriaFinanceiraRead, CategoriaFinanceiraUpdate
 )
 from app.models_modules import (
     ContaBancaria, CentroCusto, ContaPagar, ContaReceber,
     MovimentacaoBancaria, SaldoDiario, TipoMovimentacaoBancaria,
-    StatusPagamento
+    StatusPagamento, ParcelaContaPagar, ParcelaContaReceber,
+    ContaRecorrente, CategoriaFinanceira, TipoParcelamento
 )
 
 router = APIRouter()
@@ -989,4 +995,635 @@ def desconciliar_movimentacoes(
     return {
         "message": f"{len(movimentacoes)} movimentações desconciliadas com sucesso",
         "movimentacoes_desconciliadas": len(movimentacoes)
+    }
+
+
+# =============================================================================
+# CONTAS A PAGAR PARCELADAS
+# =============================================================================
+
+@router.post("/contas-pagar/parcelada", response_model=ContaPagarRead)
+def create_conta_pagar_parcelada(
+    conta: ContaPagarParceladaCreate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """Cria uma conta a pagar com parcelas"""
+    # Criar conta a pagar principal
+    db_conta = ContaPagar(
+        descricao=conta.descricao,
+        fornecedor_id=conta.fornecedor_id,
+        centro_custo_id=conta.centro_custo_id,
+        pedido_compra_id=conta.pedido_compra_id,
+        categoria_id=conta.categoria_id,
+        data_emissao=datetime.utcnow(),
+        data_vencimento=conta.data_primeira_parcela,
+        valor_original=conta.valor_total,
+        tipo_parcelamento=TipoParcelamento.PARCELADO,
+        quantidade_parcelas=conta.quantidade_parcelas,
+        forma_pagamento=conta.forma_pagamento,
+        numero_documento=conta.numero_documento,
+        observacoes=conta.observacoes,
+        status=StatusPagamento.PENDENTE
+    )
+    session.add(db_conta)
+    session.flush()
+    
+    # Criar parcelas
+    # NOTE: Using simple division for now. For production, consider using Decimal for precise financial calculations
+    valor_parcela = round(conta.valor_total / conta.quantidade_parcelas, 2)
+    for i in range(conta.quantidade_parcelas):
+        data_vencimento = conta.data_primeira_parcela + timedelta(days=i * conta.intervalo_dias)
+        parcela = ParcelaContaPagar(
+            conta_pagar_id=db_conta.id,
+            numero_parcela=i + 1,
+            total_parcelas=conta.quantidade_parcelas,
+            data_vencimento=data_vencimento,
+            valor=valor_parcela,
+            status=StatusPagamento.PENDENTE
+        )
+        session.add(parcela)
+    
+    session.commit()
+    session.refresh(db_conta)
+    return db_conta
+
+
+@router.post("/contas-receber/parcelada", response_model=ContaReceberRead)
+def create_conta_receber_parcelada(
+    conta: ContaReceberParceladaCreate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """Cria uma conta a receber com parcelas"""
+    # Criar conta a receber principal
+    db_conta = ContaReceber(
+        descricao=conta.descricao,
+        cliente_id=conta.cliente_id,
+        centro_custo_id=conta.centro_custo_id,
+        pedido_venda_id=conta.pedido_venda_id,
+        categoria_id=conta.categoria_id,
+        data_emissao=datetime.utcnow(),
+        data_vencimento=conta.data_primeira_parcela,
+        valor_original=conta.valor_total,
+        tipo_parcelamento=TipoParcelamento.PARCELADO,
+        quantidade_parcelas=conta.quantidade_parcelas,
+        forma_pagamento=conta.forma_pagamento,
+        numero_documento=conta.numero_documento,
+        observacoes=conta.observacoes,
+        status=StatusPagamento.PENDENTE
+    )
+    session.add(db_conta)
+    session.flush()
+    
+    # Criar parcelas
+    # NOTE: Using simple division for now. For production, consider using Decimal for precise financial calculations
+    valor_parcela = round(conta.valor_total / conta.quantidade_parcelas, 2)
+    for i in range(conta.quantidade_parcelas):
+        data_vencimento = conta.data_primeira_parcela + timedelta(days=i * conta.intervalo_dias)
+        parcela = ParcelaContaReceber(
+            conta_receber_id=db_conta.id,
+            numero_parcela=i + 1,
+            total_parcelas=conta.quantidade_parcelas,
+            data_vencimento=data_vencimento,
+            valor=valor_parcela,
+            status=StatusPagamento.PENDENTE
+        )
+        session.add(parcela)
+    
+    session.commit()
+    session.refresh(db_conta)
+    return db_conta
+
+
+@router.get("/contas-pagar/{conta_id}/parcelas", response_model=List[ParcelaContaPagarRead])
+def list_parcelas_conta_pagar(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Lista as parcelas de uma conta a pagar"""
+    conta = session.query(ContaPagar).filter(ContaPagar.id == conta_id).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta a pagar não encontrada")
+    
+    return session.query(ParcelaContaPagar).filter(
+        ParcelaContaPagar.conta_pagar_id == conta_id
+    ).order_by(ParcelaContaPagar.numero_parcela).all()
+
+
+@router.get("/contas-receber/{conta_id}/parcelas", response_model=List[ParcelaContaReceberRead])
+def list_parcelas_conta_receber(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Lista as parcelas de uma conta a receber"""
+    conta = session.query(ContaReceber).filter(ContaReceber.id == conta_id).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta a receber não encontrada")
+    
+    return session.query(ParcelaContaReceber).filter(
+        ParcelaContaReceber.conta_receber_id == conta_id
+    ).order_by(ParcelaContaReceber.numero_parcela).all()
+
+
+@router.post("/contas-pagar/{conta_id}/parcelas/{parcela_id}/baixar")
+def baixar_parcela_conta_pagar(
+    conta_id: int,
+    parcela_id: int,
+    baixa: BaixaContaPagar,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Baixa uma parcela individual de conta a pagar"""
+    parcela = session.query(ParcelaContaPagar).filter(
+        ParcelaContaPagar.id == parcela_id,
+        ParcelaContaPagar.conta_pagar_id == conta_id
+    ).first()
+    
+    if not parcela:
+        raise HTTPException(status_code=404, detail="Parcela não encontrada")
+    
+    if parcela.status == StatusPagamento.PAGO:
+        raise HTTPException(status_code=400, detail="Parcela já está paga")
+    
+    # Atualizar parcela
+    parcela.data_pagamento = baixa.data_pagamento or datetime.utcnow()
+    parcela.valor_pago = baixa.valor_pago
+    parcela.juros = baixa.juros
+    parcela.desconto = baixa.desconto
+    parcela.status = StatusPagamento.PAGO
+    
+    # Criar movimentação bancária
+    movimentacao = MovimentacaoBancaria(
+        conta_bancaria_id=baixa.conta_bancaria_id,
+        tipo=TipoMovimentacaoBancaria.SAQUE,
+        natureza="SAIDA",
+        data_movimentacao=parcela.data_pagamento,
+        valor=baixa.valor_pago,
+        descricao=f"Pagamento parcela {parcela.numero_parcela}/{parcela.total_parcelas} - Conta: {parcela.conta_pagar_id}",
+        conta_pagar_id=conta_id
+    )
+    session.add(movimentacao)
+    
+    # Atualizar saldo da conta bancária
+    conta_bancaria = session.query(ContaBancaria).filter(
+        ContaBancaria.id == baixa.conta_bancaria_id
+    ).first()
+    if conta_bancaria:
+        conta_bancaria.saldo_atual -= baixa.valor_pago
+    
+    # Verificar se todas as parcelas foram pagas
+    conta = session.query(ContaPagar).filter(ContaPagar.id == conta_id).first()
+    todas_parcelas = session.query(ParcelaContaPagar).filter(
+        ParcelaContaPagar.conta_pagar_id == conta_id
+    ).all()
+    
+    if all(p.status == StatusPagamento.PAGO for p in todas_parcelas):
+        conta.status = StatusPagamento.PAGO
+        conta.data_pagamento = datetime.utcnow()
+        conta.valor_pago = sum(p.valor_pago for p in todas_parcelas)
+    else:
+        valor_total_pago = sum(p.valor_pago for p in todas_parcelas if p.status == StatusPagamento.PAGO)
+        if valor_total_pago > 0:
+            conta.status = StatusPagamento.PARCIAL
+            conta.valor_pago = valor_total_pago
+    
+    session.commit()
+    
+    return {"message": "Parcela baixada com sucesso", "parcela_id": parcela_id}
+
+
+@router.post("/contas-receber/{conta_id}/parcelas/{parcela_id}/baixar")
+def baixar_parcela_conta_receber(
+    conta_id: int,
+    parcela_id: int,
+    baixa: BaixaContaReceber,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Baixa uma parcela individual de conta a receber"""
+    parcela = session.query(ParcelaContaReceber).filter(
+        ParcelaContaReceber.id == parcela_id,
+        ParcelaContaReceber.conta_receber_id == conta_id
+    ).first()
+    
+    if not parcela:
+        raise HTTPException(status_code=404, detail="Parcela não encontrada")
+    
+    if parcela.status == StatusPagamento.PAGO:
+        raise HTTPException(status_code=400, detail="Parcela já está paga")
+    
+    # Atualizar parcela
+    parcela.data_recebimento = baixa.data_recebimento or datetime.utcnow()
+    parcela.valor_recebido = baixa.valor_recebido
+    parcela.juros = baixa.juros
+    parcela.desconto = baixa.desconto
+    parcela.status = StatusPagamento.PAGO
+    
+    # Criar movimentação bancária
+    movimentacao = MovimentacaoBancaria(
+        conta_bancaria_id=baixa.conta_bancaria_id,
+        tipo=TipoMovimentacaoBancaria.DEPOSITO,
+        natureza="ENTRADA",
+        data_movimentacao=parcela.data_recebimento,
+        valor=baixa.valor_recebido,
+        descricao=f"Recebimento parcela {parcela.numero_parcela}/{parcela.total_parcelas} - Conta: {parcela.conta_receber_id}",
+        conta_receber_id=conta_id
+    )
+    session.add(movimentacao)
+    
+    # Atualizar saldo da conta bancária
+    conta_bancaria = session.query(ContaBancaria).filter(
+        ContaBancaria.id == baixa.conta_bancaria_id
+    ).first()
+    if conta_bancaria:
+        conta_bancaria.saldo_atual += baixa.valor_recebido
+    
+    # Verificar se todas as parcelas foram recebidas
+    conta = session.query(ContaReceber).filter(ContaReceber.id == conta_id).first()
+    todas_parcelas = session.query(ParcelaContaReceber).filter(
+        ParcelaContaReceber.conta_receber_id == conta_id
+    ).all()
+    
+    if all(p.status == StatusPagamento.PAGO for p in todas_parcelas):
+        conta.status = StatusPagamento.PAGO
+        conta.data_recebimento = datetime.utcnow()
+        conta.valor_recebido = sum(p.valor_recebido for p in todas_parcelas)
+    else:
+        valor_total_recebido = sum(p.valor_recebido for p in todas_parcelas if p.status == StatusPagamento.PAGO)
+        if valor_total_recebido > 0:
+            conta.status = StatusPagamento.PARCIAL
+            conta.valor_recebido = valor_total_recebido
+    
+    session.commit()
+    
+    return {"message": "Parcela recebida com sucesso", "parcela_id": parcela_id}
+
+
+@router.put("/contas-pagar/{conta_id}/parcelas/{parcela_id}/reagendar")
+def reagendar_parcela_conta_pagar(
+    conta_id: int,
+    parcela_id: int,
+    nova_data: datetime,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Reagenda uma parcela de conta a pagar"""
+    parcela = session.query(ParcelaContaPagar).filter(
+        ParcelaContaPagar.id == parcela_id,
+        ParcelaContaPagar.conta_pagar_id == conta_id
+    ).first()
+    
+    if not parcela:
+        raise HTTPException(status_code=404, detail="Parcela não encontrada")
+    
+    if parcela.status == StatusPagamento.PAGO:
+        raise HTTPException(status_code=400, detail="Não é possível reagendar parcela já paga")
+    
+    parcela.data_vencimento = nova_data
+    session.commit()
+    
+    return {"message": "Parcela reagendada com sucesso", "parcela_id": parcela_id}
+
+
+# =============================================================================
+# CONTAS RECORRENTES
+# =============================================================================
+
+@router.get("/contas-recorrentes", response_model=List[ContaRecorrenteRead])
+def list_contas_recorrentes(
+    tipo: str = Query(None, description="Filtrar por tipo: pagar ou receber"),
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Lista todas as contas recorrentes"""
+    query = session.query(ContaRecorrente)
+    if tipo:
+        query = query.filter(ContaRecorrente.tipo == tipo)
+    return query.filter(ContaRecorrente.ativa == 1).all()
+
+
+@router.post("/contas-recorrentes", response_model=ContaRecorrenteRead)
+def create_conta_recorrente(
+    conta: ContaRecorrenteCreate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """Cria uma conta recorrente"""
+    # Validar que fornecedor_id ou cliente_id está presente
+    if conta.tipo == "pagar" and not conta.fornecedor_id:
+        raise HTTPException(status_code=400, detail="fornecedor_id é obrigatório para contas a pagar")
+    if conta.tipo == "receber" and not conta.cliente_id:
+        raise HTTPException(status_code=400, detail="cliente_id é obrigatório para contas a receber")
+    
+    # Validar dia_vencimento
+    if conta.dia_vencimento < 1 or conta.dia_vencimento > 28:
+        raise HTTPException(status_code=400, detail="dia_vencimento deve estar entre 1 e 28")
+    
+    db_conta = ContaRecorrente(**conta.model_dump())
+    session.add(db_conta)
+    session.commit()
+    session.refresh(db_conta)
+    return db_conta
+
+
+@router.get("/contas-recorrentes/{conta_id}", response_model=ContaRecorrenteRead)
+def get_conta_recorrente(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Busca uma conta recorrente por ID"""
+    conta = session.query(ContaRecorrente).filter(ContaRecorrente.id == conta_id).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta recorrente não encontrada")
+    return conta
+
+
+@router.put("/contas-recorrentes/{conta_id}", response_model=ContaRecorrenteRead)
+def update_conta_recorrente(
+    conta_id: int,
+    conta_update: ContaRecorrenteUpdate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Atualiza uma conta recorrente"""
+    db_conta = session.query(ContaRecorrente).filter(ContaRecorrente.id == conta_id).first()
+    if not db_conta:
+        raise HTTPException(status_code=404, detail="Conta recorrente não encontrada")
+    
+    update_data = conta_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_conta, key, value)
+    
+    session.commit()
+    session.refresh(db_conta)
+    return db_conta
+
+
+@router.delete("/contas-recorrentes/{conta_id}")
+def delete_conta_recorrente(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:delete"))
+):
+    """Desativa uma conta recorrente"""
+    db_conta = session.query(ContaRecorrente).filter(ContaRecorrente.id == conta_id).first()
+    if not db_conta:
+        raise HTTPException(status_code=404, detail="Conta recorrente não encontrada")
+    
+    db_conta.ativa = 0
+    session.commit()
+    return {"message": "Conta recorrente desativada com sucesso"}
+
+
+@router.post("/contas-recorrentes/{conta_id}/pausar")
+def pausar_conta_recorrente(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Pausa uma conta recorrente"""
+    db_conta = session.query(ContaRecorrente).filter(ContaRecorrente.id == conta_id).first()
+    if not db_conta:
+        raise HTTPException(status_code=404, detail="Conta recorrente não encontrada")
+    
+    db_conta.ativa = 0
+    session.commit()
+    return {"message": "Conta recorrente pausada com sucesso"}
+
+
+@router.post("/contas-recorrentes/{conta_id}/ativar")
+def ativar_conta_recorrente(
+    conta_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Ativa uma conta recorrente"""
+    db_conta = session.query(ContaRecorrente).filter(ContaRecorrente.id == conta_id).first()
+    if not db_conta:
+        raise HTTPException(status_code=404, detail="Conta recorrente não encontrada")
+    
+    db_conta.ativa = 1
+    session.commit()
+    return {"message": "Conta recorrente ativada com sucesso"}
+
+
+@router.post("/contas-recorrentes/gerar-mensal")
+def gerar_contas_recorrentes_mensal(
+    mes: int = Query(..., ge=1, le=12, description="Mês (1-12)"),
+    ano: int = Query(..., ge=2000, description="Ano"),
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """Gera contas a pagar/receber do mês baseado nas contas recorrentes ativas"""
+    data_referencia = date(ano, mes, 1)
+    contas_geradas = []
+    
+    # Buscar contas recorrentes ativas
+    contas_recorrentes = session.query(ContaRecorrente).filter(
+        ContaRecorrente.ativa == 1,
+        ContaRecorrente.data_inicio <= data_referencia
+    ).all()
+    
+    for conta_rec in contas_recorrentes:
+        # Verificar se já foi gerada neste mês
+        if conta_rec.ultima_geracao and conta_rec.ultima_geracao.month == mes and conta_rec.ultima_geracao.year == ano:
+            continue
+        
+        # Verificar se está dentro do período
+        if conta_rec.data_fim and data_referencia > conta_rec.data_fim:
+            continue
+        
+        # Calcular data de vencimento
+        data_vencimento = date(ano, mes, min(conta_rec.dia_vencimento, 28))
+        
+        if conta_rec.tipo == "pagar":
+            nova_conta = ContaPagar(
+                descricao=conta_rec.descricao,
+                fornecedor_id=conta_rec.fornecedor_id,
+                centro_custo_id=conta_rec.centro_custo_id,
+                conta_recorrente_id=conta_rec.id,
+                data_emissao=datetime.utcnow(),
+                data_vencimento=datetime.combine(data_vencimento, datetime.min.time()),
+                valor_original=conta_rec.valor,
+                tipo_parcelamento=TipoParcelamento.RECORRENTE,
+                observacoes=f"Gerada automaticamente - {conta_rec.observacoes or ''}",
+                status=StatusPagamento.PENDENTE
+            )
+            session.add(nova_conta)
+            contas_geradas.append({"tipo": "pagar", "descricao": conta_rec.descricao})
+        elif conta_rec.tipo == "receber":
+            nova_conta = ContaReceber(
+                descricao=conta_rec.descricao,
+                cliente_id=conta_rec.cliente_id,
+                centro_custo_id=conta_rec.centro_custo_id,
+                conta_recorrente_id=conta_rec.id,
+                data_emissao=datetime.utcnow(),
+                data_vencimento=datetime.combine(data_vencimento, datetime.min.time()),
+                valor_original=conta_rec.valor,
+                tipo_parcelamento=TipoParcelamento.RECORRENTE,
+                observacoes=f"Gerada automaticamente - {conta_rec.observacoes or ''}",
+                status=StatusPagamento.PENDENTE
+            )
+            session.add(nova_conta)
+            contas_geradas.append({"tipo": "receber", "descricao": conta_rec.descricao})
+        
+        # Atualizar última geração
+        conta_rec.ultima_geracao = data_referencia
+    
+    session.commit()
+    
+    return {
+        "message": f"{len(contas_geradas)} contas geradas para {mes}/{ano}",
+        "contas_geradas": contas_geradas
+    }
+
+
+# =============================================================================
+# CATEGORIAS FINANCEIRAS
+# =============================================================================
+
+@router.get("/categorias-financeiras", response_model=List[CategoriaFinanceiraRead])
+def list_categorias_financeiras(
+    tipo: str = Query(None, description="Filtrar por tipo: receita ou despesa"),
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Lista todas as categorias financeiras"""
+    query = session.query(CategoriaFinanceira).filter(CategoriaFinanceira.ativa == 1)
+    if tipo:
+        query = query.filter(CategoriaFinanceira.tipo == tipo)
+    return query.all()
+
+
+@router.post("/categorias-financeiras", response_model=CategoriaFinanceiraRead)
+def create_categoria_financeira(
+    categoria: CategoriaFinanceiraCreate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """Cria uma categoria financeira"""
+    # Verificar se código já existe
+    existe = session.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.codigo == categoria.codigo
+    ).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="Código já existe")
+    
+    db_categoria = CategoriaFinanceira(**categoria.model_dump())
+    session.add(db_categoria)
+    session.commit()
+    session.refresh(db_categoria)
+    return db_categoria
+
+
+@router.get("/categorias-financeiras/{categoria_id}", response_model=CategoriaFinanceiraRead)
+def get_categoria_financeira(
+    categoria_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Busca uma categoria financeira por ID"""
+    categoria = session.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.id == categoria_id
+    ).first()
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    return categoria
+
+
+@router.put("/categorias-financeiras/{categoria_id}", response_model=CategoriaFinanceiraRead)
+def update_categoria_financeira(
+    categoria_id: int,
+    categoria_update: CategoriaFinanceiraUpdate,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:update"))
+):
+    """Atualiza uma categoria financeira"""
+    db_categoria = session.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.id == categoria_id
+    ).first()
+    if not db_categoria:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    
+    update_data = categoria_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_categoria, key, value)
+    
+    session.commit()
+    session.refresh(db_categoria)
+    return db_categoria
+
+
+@router.delete("/categorias-financeiras/{categoria_id}")
+def delete_categoria_financeira(
+    categoria_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:delete"))
+):
+    """Desativa uma categoria financeira"""
+    db_categoria = session.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.id == categoria_id
+    ).first()
+    if not db_categoria:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    
+    db_categoria.ativa = 0
+    session.commit()
+    return {"message": "Categoria desativada com sucesso"}
+
+
+# =============================================================================
+# RELATÓRIOS
+# =============================================================================
+
+@router.get("/financeiro/dre")
+def relatorio_dre(
+    mes: int = Query(..., ge=1, le=12, description="Mês (1-12)"),
+    ano: int = Query(..., ge=2000, description="Ano"),
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Relatório DRE simplificado (Demonstrativo de Resultado do Exercício)"""
+    from calendar import monthrange
+    
+    # Calcular primeiro e último dia do mês
+    primeiro_dia = date(ano, mes, 1)
+    ultimo_dia = date(ano, mes, monthrange(ano, mes)[1])
+    
+    # Buscar receitas (contas receber pagas)
+    receitas = session.query(ContaReceber).filter(
+        ContaReceber.status == StatusPagamento.PAGO,
+        ContaReceber.data_recebimento >= datetime.combine(primeiro_dia, datetime.min.time()),
+        ContaReceber.data_recebimento <= datetime.combine(ultimo_dia, datetime.max.time())
+    ).all()
+    
+    total_receitas = sum(c.valor_recebido for c in receitas)
+    
+    # Buscar despesas (contas pagar pagas)
+    despesas = session.query(ContaPagar).filter(
+        ContaPagar.status == StatusPagamento.PAGO,
+        ContaPagar.data_pagamento >= datetime.combine(primeiro_dia, datetime.min.time()),
+        ContaPagar.data_pagamento <= datetime.combine(ultimo_dia, datetime.max.time())
+    ).all()
+    
+    total_despesas = sum(c.valor_pago for c in despesas)
+    
+    resultado = total_receitas - total_despesas
+    
+    return {
+        "periodo": f"{mes:02d}/{ano}",
+        "receitas": {
+            "total": total_receitas,
+            "quantidade": len(receitas)
+        },
+        "despesas": {
+            "total": total_despesas,
+            "quantidade": len(despesas)
+        },
+        "resultado": resultado,
+        "resultado_percentual": (resultado / total_receitas * 100) if total_receitas > 0 else 0
     }
