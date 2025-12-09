@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.db import get_session
 from app.dependencies import require_permission
@@ -885,19 +885,38 @@ def criar_transferencia(
 @router.get("/conciliacao/{conta_id}")
 def listar_pendentes_conciliacao(
     conta_id: int,
+    data_inicio: Optional[str] = Query(None, description="Data inicial (formato YYYY-MM-DD)"),
+    data_fim: Optional[str] = Query(None, description="Data final (formato YYYY-MM-DD)"),
     session: Session = Depends(get_session),
     _: bool = Depends(require_permission("financeiro:read"))
 ):
-    """Lista movimentações pendentes de conciliação"""
+    """Lista movimentações pendentes de conciliação com filtros de data"""
     conta = session.query(ContaBancaria).filter(ContaBancaria.id == conta_id).first()
     if not conta:
         raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
     
     # Buscar movimentações não conciliadas
-    movimentacoes = session.query(MovimentacaoBancaria).filter(
+    query = session.query(MovimentacaoBancaria).filter(
         MovimentacaoBancaria.conta_bancaria_id == conta_id,
         MovimentacaoBancaria.conciliado == False
-    ).order_by(MovimentacaoBancaria.data_movimentacao.desc()).all()
+    )
+    
+    # Aplicar filtros de data se fornecidos
+    if data_inicio:
+        try:
+            dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            query = query.filter(MovimentacaoBancaria.data_competencia >= dt_inicio)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de data_inicio inválido. Use YYYY-MM-DD")
+    
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+            query = query.filter(MovimentacaoBancaria.data_competencia <= dt_fim)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de data_fim inválido. Use YYYY-MM-DD")
+    
+    movimentacoes = query.order_by(MovimentacaoBancaria.data_movimentacao.desc()).all()
     
     total_entradas = sum(m.valor for m in movimentacoes if m.natureza == "ENTRADA")
     total_saidas = sum(m.valor for m in movimentacoes if m.natureza == "SAIDA")
@@ -907,6 +926,10 @@ def listar_pendentes_conciliacao(
             "id": conta.id,
             "nome": conta.nome,
             "saldo_atual": conta.saldo_atual
+        },
+        "periodo": {
+            "data_inicio": data_inicio,
+            "data_fim": data_fim
         },
         "total_entradas_pendentes": total_entradas,
         "total_saidas_pendentes": total_saidas,

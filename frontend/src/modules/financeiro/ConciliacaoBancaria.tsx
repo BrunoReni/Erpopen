@@ -28,6 +28,8 @@ export function ConciliacaoBancaria() {
   const [loading, setLoading] = useState(false);
   const [totalEntradasPendentes, setTotalEntradasPendentes] = useState(0);
   const [totalSaidasPendentes, setTotalSaidasPendentes] = useState(0);
+  const [dataInicio, setDataInicio] = useState<string>('');
+  const [dataFim, setDataFim] = useState<string>('');
 
   useEffect(() => {
     fetchContas();
@@ -37,7 +39,7 @@ export function ConciliacaoBancaria() {
     if (contaSelecionadaId > 0) {
       fetchMovimentacoesPendentes();
     }
-  }, [contaSelecionadaId]);
+  }, [contaSelecionadaId, dataInicio, dataFim]);
 
   const fetchContas = async () => {
     try {
@@ -51,7 +53,12 @@ export function ConciliacaoBancaria() {
   const fetchMovimentacoesPendentes = async () => {
     setLoading(true);
     try {
-      const response = await api.get(`/financeiro/conciliacao/${contaSelecionadaId}`);
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('data_inicio', dataInicio);
+      if (dataFim) params.append('data_fim', dataFim);
+      
+      const url = `/financeiro/conciliacao/${contaSelecionadaId}${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await api.get(url);
       setMovimentacoes(response.data.movimentacoes || []);
       setTotalEntradasPendentes(response.data.total_entradas_pendentes || 0);
       setTotalSaidasPendentes(response.data.total_saidas_pendentes || 0);
@@ -146,6 +153,46 @@ export function ConciliacaoBancaria() {
             ))}
           </select>
         </div>
+
+        {/* Filtros de Data */}
+        {contaSelecionadaId > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtros de Data</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data Inicial
+                </label>
+                <input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data Final
+                </label>
+                <input
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={fetchMovimentacoesPendentes}
+                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  disabled={loading}
+                >
+                  {loading ? 'Carregando...' : 'Filtrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {contaSelecionadaId > 0 && (
           <>
