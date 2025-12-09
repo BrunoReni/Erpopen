@@ -1753,17 +1753,16 @@ def compensar_contas(
             else:
                 conta.status = StatusPagamento.PARCIAL
         
-        # Criar registro de compensação para cada par de contas
-        for conta_pagar in contas_pagar:
-            for conta_receber in contas_receber:
-                compensacao = CompensacaoContas(
-                    data_compensacao=request.data_compensacao,
-                    valor_compensado=valor_compensacao / (len(contas_pagar) * len(contas_receber)),  # Distribuir proporcionalmente
-                    conta_pagar_id=conta_pagar.id,
-                    conta_receber_id=conta_receber.id,
-                    observacao=request.observacao
-                )
-                session.add(compensacao)
+        # Criar registro de compensação
+        # Criar um registro único para toda a compensação
+        compensacao = CompensacaoContas(
+            data_compensacao=request.data_compensacao,
+            valor_compensado=valor_compensacao,
+            conta_pagar_id=contas_pagar[0].id,  # Principal conta a pagar
+            conta_receber_id=contas_receber[0].id,  # Principal conta a receber
+            observacao=f"{request.observacao or ''} - Compensação entre {len(contas_pagar)} conta(s) a pagar e {len(contas_receber)} conta(s) a receber"
+        )
+        session.add(compensacao)
         
         session.commit()
         

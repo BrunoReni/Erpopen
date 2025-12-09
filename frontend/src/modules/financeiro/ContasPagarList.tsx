@@ -167,6 +167,9 @@ export function ContasPagarList() {
     return labels[status] || status;
   };
 
+  // Number of table columns for colspan calculation
+  const TABLE_COLUMNS = 6;
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -299,7 +302,7 @@ export function ContasPagarList() {
                     </tr>
                     {expandedContaId === conta.id && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                        <td colSpan={TABLE_COLUMNS} className="px-6 py-4 bg-gray-50">
                           {loadingParcelas[conta.id] ? (
                             <div className="text-center text-gray-500">Carregando parcelas...</div>
                           ) : parcelas[conta.id] ? (
