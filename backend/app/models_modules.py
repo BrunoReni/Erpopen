@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint, Date, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint, Date, Boolean, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -71,6 +71,22 @@ class TipoMovimentacaoBancaria(str, enum.Enum):
     OUTROS = "outros"
 
 
+class TipoParcelamento(str, enum.Enum):
+    AVISTA = "avista"
+    PARCELADO = "parcelado"
+    RECORRENTE = "recorrente"
+
+
+class FormaPagamento(str, enum.Enum):
+    DINHEIRO = "dinheiro"
+    PIX = "pix"
+    BOLETO = "boleto"
+    CARTAO_CREDITO = "cartao_credito"
+    CARTAO_DEBITO = "cartao_debito"
+    TRANSFERENCIA = "transferencia"
+    CHEQUE = "cheque"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS
 # =============================================================================
@@ -101,7 +117,7 @@ class PedidoCompra(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     numero = Column(String, unique=True, index=True, nullable=False)
-    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"))
+    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"), nullable=False)
     data_pedido = Column(DateTime, default=datetime.utcnow)
     data_entrega_prevista = Column(DateTime)
     status = Column(SQLEnum(StatusCompra), default=StatusCompra.RASCUNHO)
@@ -121,7 +137,7 @@ class ItemPedidoCompra(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     pedido_id = Column(Integer, ForeignKey("pedidos_compra.id"))
-    material_id = Column(Integer, ForeignKey("materiais.id"))
+    material_id = Column(Integer, ForeignKey("materiais.id"), nullable=False)
     descricao = Column(String, nullable=False)
     quantidade = Column(Float, nullable=False)
     unidade = Column(String)
@@ -287,18 +303,28 @@ class ContaPagar(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     descricao = Column(String, nullable=False)
-    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"))
+    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"), nullable=False)
     pedido_compra_id = Column(Integer, ForeignKey("pedidos_compra.id"), nullable=True)
     centro_custo_id = Column(Integer, ForeignKey("centros_custo.id"))
+    conta_recorrente_id = Column(Integer, ForeignKey("contas_recorrentes.id"), nullable=True)
+    categoria_id = Column(Integer, ForeignKey("categorias_financeiras.id"), nullable=True)
+    
     data_emissao = Column(DateTime, default=datetime.utcnow)
     data_vencimento = Column(DateTime, nullable=False)
     data_pagamento = Column(DateTime)
     valor_original = Column(Float, nullable=False)
     valor_pago = Column(Float, default=0.0)
     
-    # NOVOS campos
+    # Campos de parcelamento
+    tipo_parcelamento = Column(SQLEnum(TipoParcelamento), default=TipoParcelamento.AVISTA)
+    quantidade_parcelas = Column(Integer, default=1)
+    dia_vencimento_fixo = Column(Integer, nullable=True)
+    
+    # Campos financeiros
     juros = Column(Float, default=0.0)
     desconto = Column(Float, default=0.0)
+    forma_pagamento = Column(SQLEnum(FormaPagamento), nullable=True)
+    numero_documento = Column(String, nullable=True)
     
     status = Column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
     observacoes = Column(Text)
@@ -307,6 +333,13 @@ class ContaPagar(Base):
     
     # Relacionamentos
     fornecedor = relationship("Fornecedor")
+    parcelas = relationship("ParcelaContaPagar", back_populates="conta_pagar", cascade="all, delete-orphan")
+    
+    # Indexes
+    __table_args__ = (
+        Index('ix_contas_pagar_fornecedor_status', 'fornecedor_id', 'status'),
+        Index('ix_contas_pagar_vencimento', 'data_vencimento'),
+    )
 
 
 class ContaReceber(Base):
@@ -315,21 +348,29 @@ class ContaReceber(Base):
     id = Column(Integer, primary_key=True, index=True)
     descricao = Column(String, nullable=False)
     
-    # ATUALIZADO: De String para FK
-    cliente_nome = Column(String, nullable=True)  # Mantido para compatibilidade com dados antigos
-    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)  # Novo FK
-    pedido_venda_id = Column(Integer, ForeignKey("pedidos_venda.id"), nullable=True)  # Link com pedido de venda
-    
+    # ATUALIZADO: cliente_id agora é obrigatório, cliente_nome removido em Task 22
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    pedido_venda_id = Column(Integer, ForeignKey("pedidos_venda.id"), nullable=True)
     centro_custo_id = Column(Integer, ForeignKey("centros_custo.id"))
+    conta_recorrente_id = Column(Integer, ForeignKey("contas_recorrentes.id"), nullable=True)
+    categoria_id = Column(Integer, ForeignKey("categorias_financeiras.id"), nullable=True)
+    
     data_emissao = Column(DateTime, default=datetime.utcnow)
     data_vencimento = Column(DateTime, nullable=False)
     data_recebimento = Column(DateTime)
     valor_original = Column(Float, nullable=False)
     valor_recebido = Column(Float, default=0.0)
     
-    # NOVOS campos
+    # Campos de parcelamento
+    tipo_parcelamento = Column(SQLEnum(TipoParcelamento), default=TipoParcelamento.AVISTA)
+    quantidade_parcelas = Column(Integer, default=1)
+    dia_vencimento_fixo = Column(Integer, nullable=True)
+    
+    # Campos financeiros
     juros = Column(Float, default=0.0)
     desconto = Column(Float, default=0.0)
+    forma_pagamento = Column(SQLEnum(FormaPagamento), nullable=True)
+    numero_documento = Column(String, nullable=True)
     
     status = Column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
     observacoes = Column(Text)
@@ -339,6 +380,99 @@ class ContaReceber(Base):
     # Relacionamentos
     cliente = relationship("Cliente", back_populates="contas_receber")
     pedido_venda = relationship("PedidoVenda", back_populates="contas_receber")
+    parcelas = relationship("ParcelaContaReceber", back_populates="conta_receber", cascade="all, delete-orphan")
+    
+    # Indexes
+    __table_args__ = (
+        Index('ix_contas_receber_cliente_status', 'cliente_id', 'status'),
+        Index('ix_contas_receber_vencimento', 'data_vencimento'),
+    )
+
+
+class ParcelaContaPagar(Base):
+    __tablename__ = "parcelas_conta_pagar"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conta_pagar_id = Column(Integer, ForeignKey("contas_pagar.id"), nullable=False)
+    numero_parcela = Column(Integer, nullable=False)
+    total_parcelas = Column(Integer, nullable=False)
+    data_vencimento = Column(DateTime, nullable=False)
+    data_pagamento = Column(DateTime, nullable=True)
+    valor = Column(Float, nullable=False)
+    valor_pago = Column(Float, default=0.0)
+    juros = Column(Float, default=0.0)
+    desconto = Column(Float, default=0.0)
+    status = Column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
+    observacoes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    conta_pagar = relationship("ContaPagar", back_populates="parcelas")
+
+
+class ParcelaContaReceber(Base):
+    __tablename__ = "parcelas_conta_receber"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conta_receber_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=False)
+    numero_parcela = Column(Integer, nullable=False)
+    total_parcelas = Column(Integer, nullable=False)
+    data_vencimento = Column(DateTime, nullable=False)
+    data_recebimento = Column(DateTime, nullable=True)
+    valor = Column(Float, nullable=False)
+    valor_recebido = Column(Float, default=0.0)
+    juros = Column(Float, default=0.0)
+    desconto = Column(Float, default=0.0)
+    status = Column(SQLEnum(StatusPagamento), default=StatusPagamento.PENDENTE)
+    observacoes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    conta_receber = relationship("ContaReceber", back_populates="parcelas")
+
+
+class ContaRecorrente(Base):
+    __tablename__ = "contas_recorrentes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tipo = Column(String, nullable=False)  # "pagar" ou "receber"
+    descricao = Column(String, nullable=False)
+    fornecedor_id = Column(Integer, ForeignKey("fornecedores.id"), nullable=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
+    centro_custo_id = Column(Integer, ForeignKey("centros_custo.id"), nullable=True)
+    valor = Column(Float, nullable=False)
+    dia_vencimento = Column(Integer, nullable=False)  # 1-28
+    periodicidade = Column(String, default="mensal")  # mensal, trimestral, anual
+    data_inicio = Column(Date, nullable=False)
+    data_fim = Column(Date, nullable=True)  # Null = indefinido
+    ativa = Column(Integer, default=1)
+    ultima_geracao = Column(Date, nullable=True)
+    observacoes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    fornecedor = relationship("Fornecedor")
+    cliente = relationship("Cliente")
+    centro_custo = relationship("CentroCusto")
+
+
+class CategoriaFinanceira(Base):
+    __tablename__ = "categorias_financeiras"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    codigo = Column(String, unique=True, nullable=False)
+    nome = Column(String, nullable=False)
+    tipo = Column(String, nullable=False)  # "receita" ou "despesa"
+    categoria_pai_id = Column(Integer, ForeignKey("categorias_financeiras.id"), nullable=True)
+    ativa = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    subcategorias = relationship("CategoriaFinanceira", remote_side=[id])
 
 
 # =============================================================================

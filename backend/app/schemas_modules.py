@@ -73,6 +73,22 @@ class StatusPedidoVenda(str, Enum):
     CANCELADO = "cancelado"
 
 
+class TipoParcelamento(str, Enum):
+    AVISTA = "avista"
+    PARCELADO = "parcelado"
+    RECORRENTE = "recorrente"
+
+
+class FormaPagamento(str, Enum):
+    DINHEIRO = "dinheiro"
+    PIX = "pix"
+    BOLETO = "boleto"
+    CARTAO_CREDITO = "cartao_credito"
+    CARTAO_DEBITO = "cartao_debito"
+    TRANSFERENCIA = "transferencia"
+    CHEQUE = "cheque"
+
+
 # =============================================================================
 # MÓDULO DE COMPRAS - SCHEMAS
 # =============================================================================
@@ -318,10 +334,16 @@ class CentroCustoRead(CentroCustoBase):
 # Conta a Pagar
 class ContaPagarBase(BaseModel):
     descricao: str
-    fornecedor_id: Optional[int] = None
+    fornecedor_id: int
     centro_custo_id: Optional[int] = None
+    categoria_id: Optional[int] = None
     data_vencimento: datetime
     valor_original: float
+    tipo_parcelamento: TipoParcelamento = TipoParcelamento.AVISTA
+    quantidade_parcelas: int = 1
+    dia_vencimento_fixo: Optional[int] = None
+    forma_pagamento: Optional[FormaPagamento] = None
+    numero_documento: Optional[str] = None
     observacoes: Optional[str] = None
 
 
@@ -332,13 +354,17 @@ class ContaPagarCreate(ContaPagarBase):
 class ContaPagarUpdate(BaseModel):
     data_pagamento: Optional[datetime] = None
     valor_pago: Optional[float] = None
+    juros: Optional[float] = None
+    desconto: Optional[float] = None
     status: Optional[StatusPagamento] = None
+    forma_pagamento: Optional[FormaPagamento] = None
     observacoes: Optional[str] = None
 
 
 class ContaPagarRead(ContaPagarBase):
     id: int
     pedido_compra_id: Optional[int]
+    conta_recorrente_id: Optional[int]
     data_emissao: datetime
     data_pagamento: Optional[datetime]
     valor_pago: float
@@ -356,8 +382,14 @@ class ContaReceberBase(BaseModel):
     descricao: str
     cliente_id: int
     centro_custo_id: Optional[int] = None
+    categoria_id: Optional[int] = None
     data_vencimento: datetime
     valor_original: float
+    tipo_parcelamento: TipoParcelamento = TipoParcelamento.AVISTA
+    quantidade_parcelas: int = 1
+    dia_vencimento_fixo: Optional[int] = None
+    forma_pagamento: Optional[FormaPagamento] = None
+    numero_documento: Optional[str] = None
     observacoes: Optional[str] = None
 
 
@@ -368,13 +400,17 @@ class ContaReceberCreate(ContaReceberBase):
 class ContaReceberUpdate(BaseModel):
     data_recebimento: Optional[datetime] = None
     valor_recebido: Optional[float] = None
+    juros: Optional[float] = None
+    desconto: Optional[float] = None
     status: Optional[StatusPagamento] = None
+    forma_pagamento: Optional[FormaPagamento] = None
     observacoes: Optional[str] = None
 
 
 class ContaReceberRead(ContaReceberBase):
     id: int
-    cliente_nome: Optional[str] = None
+    pedido_venda_id: Optional[int]
+    conta_recorrente_id: Optional[int]
     data_emissao: datetime
     data_recebimento: Optional[datetime]
     valor_recebido: float
@@ -405,6 +441,175 @@ class BaixaContaReceber(BaseModel):
     conta_bancaria_id: int
     data_recebimento: Optional[datetime] = None
     observacoes: Optional[str] = None
+
+
+# Parcela Conta a Pagar
+class ParcelaContaPagarBase(BaseModel):
+    numero_parcela: int
+    total_parcelas: int
+    data_vencimento: datetime
+    valor: float
+    observacoes: Optional[str] = None
+
+
+class ParcelaContaPagarCreate(ParcelaContaPagarBase):
+    conta_pagar_id: int
+
+
+class ParcelaContaPagarUpdate(BaseModel):
+    data_pagamento: Optional[datetime] = None
+    valor_pago: Optional[float] = None
+    juros: Optional[float] = None
+    desconto: Optional[float] = None
+    status: Optional[StatusPagamento] = None
+    observacoes: Optional[str] = None
+
+
+class ParcelaContaPagarRead(ParcelaContaPagarBase):
+    id: int
+    conta_pagar_id: int
+    data_pagamento: Optional[datetime]
+    valor_pago: float
+    juros: float
+    desconto: float
+    status: StatusPagamento
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Parcela Conta a Receber
+class ParcelaContaReceberBase(BaseModel):
+    numero_parcela: int
+    total_parcelas: int
+    data_vencimento: datetime
+    valor: float
+    observacoes: Optional[str] = None
+
+
+class ParcelaContaReceberCreate(ParcelaContaReceberBase):
+    conta_receber_id: int
+
+
+class ParcelaContaReceberUpdate(BaseModel):
+    data_recebimento: Optional[datetime] = None
+    valor_recebido: Optional[float] = None
+    juros: Optional[float] = None
+    desconto: Optional[float] = None
+    status: Optional[StatusPagamento] = None
+    observacoes: Optional[str] = None
+
+
+class ParcelaContaReceberRead(ParcelaContaReceberBase):
+    id: int
+    conta_receber_id: int
+    data_recebimento: Optional[datetime]
+    valor_recebido: float
+    juros: float
+    desconto: float
+    status: StatusPagamento
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Conta Parcelada Create
+class ContaPagarParceladaCreate(BaseModel):
+    descricao: str
+    fornecedor_id: int
+    centro_custo_id: Optional[int] = None
+    pedido_compra_id: Optional[int] = None
+    categoria_id: Optional[int] = None
+    valor_total: float
+    quantidade_parcelas: int
+    data_primeira_parcela: datetime
+    intervalo_dias: int = 30
+    forma_pagamento: Optional[FormaPagamento] = None
+    numero_documento: Optional[str] = None
+    observacoes: Optional[str] = None
+
+
+class ContaReceberParceladaCreate(BaseModel):
+    descricao: str
+    cliente_id: int
+    centro_custo_id: Optional[int] = None
+    pedido_venda_id: Optional[int] = None
+    categoria_id: Optional[int] = None
+    valor_total: float
+    quantidade_parcelas: int
+    data_primeira_parcela: datetime
+    intervalo_dias: int = 30
+    forma_pagamento: Optional[FormaPagamento] = None
+    numero_documento: Optional[str] = None
+    observacoes: Optional[str] = None
+
+
+# Conta Recorrente
+class ContaRecorrenteBase(BaseModel):
+    tipo: str  # "pagar" ou "receber"
+    descricao: str
+    fornecedor_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    centro_custo_id: Optional[int] = None
+    valor: float
+    dia_vencimento: int
+    periodicidade: str = "mensal"
+    data_inicio: date
+    data_fim: Optional[date] = None
+    observacoes: Optional[str] = None
+
+
+class ContaRecorrenteCreate(ContaRecorrenteBase):
+    pass
+
+
+class ContaRecorrenteUpdate(BaseModel):
+    descricao: Optional[str] = None
+    valor: Optional[float] = None
+    dia_vencimento: Optional[int] = None
+    periodicidade: Optional[str] = None
+    data_fim: Optional[date] = None
+    ativa: Optional[int] = None
+    observacoes: Optional[str] = None
+
+
+class ContaRecorrenteRead(ContaRecorrenteBase):
+    id: int
+    ativa: int
+    ultima_geracao: Optional[date]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Categoria Financeira
+class CategoriaFinanceiraBase(BaseModel):
+    codigo: str
+    nome: str
+    tipo: str  # "receita" ou "despesa"
+    categoria_pai_id: Optional[int] = None
+
+
+class CategoriaFinanceiraCreate(CategoriaFinanceiraBase):
+    pass
+
+
+class CategoriaFinanceiraUpdate(BaseModel):
+    nome: Optional[str] = None
+    categoria_pai_id: Optional[int] = None
+    ativa: Optional[int] = None
+
+
+class CategoriaFinanceiraRead(CategoriaFinanceiraBase):
+    id: int
+    ativa: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 # =============================================================================
