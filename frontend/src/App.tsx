@@ -16,6 +16,8 @@ import { CentrosCustoList } from './modules/financeiro/CentrosCustoList';
 import { MovimentacoesBancariasList } from './modules/financeiro/MovimentacoesBancariasList';
 import { TransferenciaForm } from './modules/financeiro/TransferenciaForm';
 import { ConciliacaoBancaria } from './modules/financeiro/ConciliacaoBancaria';
+import { LiquidacaoForm } from './modules/financeiro/LiquidacaoForm';
+import { HistoricoLiquidacao } from './modules/financeiro/HistoricoLiquidacao';
 import { MateriaisIndex } from './modules/materiais/MateriaisIndex';
 import { VendasIndex } from './modules/vendas/VendasIndex';
 import { ClientesList } from './modules/vendas/ClientesList';
@@ -151,6 +153,24 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['financeiro:read']}>
                 <ConciliacaoBancaria />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/financeiro/liquidacao"
+            element={
+              <ProtectedRoute requiredPermissions={['financeiro:create']}>
+                <LiquidacaoForm />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/financeiro/historico-liquidacao"
+            element={
+              <ProtectedRoute requiredPermissions={['financeiro:read']}>
+                <HistoricoLiquidacao />
               </ProtectedRoute>
             }
           />

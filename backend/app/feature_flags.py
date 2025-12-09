@@ -268,16 +268,19 @@ FEATURES_REGISTRY: List[Feature] = [
         module="financeiro",
         description="Sistema de compensação e liquidação de contas a pagar/receber",
         has_backend=True,
-        has_frontend=False,  # ❌ MISSING FRONTEND
+        has_frontend=True,  # ✅ FRONTEND IMPLEMENTED
         has_tests=False,
         has_docs=True,
         backend_endpoints=[
             "POST /financeiro/compensacao",
             "GET /financeiro/compensacao",
-            "POST /financeiro/liquidacao",
+            "POST /financeiro/baixa-multipla",
             "GET /financeiro/historico-liquidacao"
         ],
-        frontend_components=[],  # ❌ EMPTY
+        frontend_components=[
+            "LiquidacaoForm.tsx",
+            "HistoricoLiquidacao.tsx"
+        ],
         test_files=[],
         doc_files=["MODULO_FINANCEIRO_AVANCADO.md"],
         issue_number=16,
