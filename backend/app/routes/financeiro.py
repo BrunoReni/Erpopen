@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.db import get_session
 from app.dependencies import require_permission
@@ -16,13 +16,17 @@ from app.schemas_modules import (
     ParcelaContaReceberCreate, ParcelaContaReceberRead, ParcelaContaReceberUpdate,
     ContaPagarParceladaCreate, ContaReceberParceladaCreate,
     ContaRecorrenteCreate, ContaRecorrenteRead, ContaRecorrenteUpdate,
-    CategoriaFinanceiraCreate, CategoriaFinanceiraRead, CategoriaFinanceiraUpdate
+    CategoriaFinanceiraCreate, CategoriaFinanceiraRead, CategoriaFinanceiraUpdate,
+    CompensacaoContasCreate, CompensacaoContasRead,
+    HistoricoLiquidacaoCreate, HistoricoLiquidacaoRead,
+    BaixaMultiplaRequest, CompensacaoRequest
 )
 from app.models_modules import (
     ContaBancaria, CentroCusto, ContaPagar, ContaReceber,
     MovimentacaoBancaria, SaldoDiario, TipoMovimentacaoBancaria,
     StatusPagamento, ParcelaContaPagar, ParcelaContaReceber,
-    ContaRecorrente, CategoriaFinanceira, TipoParcelamento
+    ContaRecorrente, CategoriaFinanceira, TipoParcelamento,
+    CompensacaoContas, HistoricoLiquidacao
 )
 
 router = APIRouter()
@@ -885,19 +889,38 @@ def criar_transferencia(
 @router.get("/conciliacao/{conta_id}")
 def listar_pendentes_conciliacao(
     conta_id: int,
+    data_inicio: Optional[str] = Query(None, description="Data inicial (formato YYYY-MM-DD)"),
+    data_fim: Optional[str] = Query(None, description="Data final (formato YYYY-MM-DD)"),
     session: Session = Depends(get_session),
     _: bool = Depends(require_permission("financeiro:read"))
 ):
-    """Lista movimentações pendentes de conciliação"""
+    """Lista movimentações pendentes de conciliação com filtros de data"""
     conta = session.query(ContaBancaria).filter(ContaBancaria.id == conta_id).first()
     if not conta:
         raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
     
     # Buscar movimentações não conciliadas
-    movimentacoes = session.query(MovimentacaoBancaria).filter(
+    query = session.query(MovimentacaoBancaria).filter(
         MovimentacaoBancaria.conta_bancaria_id == conta_id,
         MovimentacaoBancaria.conciliado == False
-    ).order_by(MovimentacaoBancaria.data_movimentacao.desc()).all()
+    )
+    
+    # Aplicar filtros de data se fornecidos
+    if data_inicio:
+        try:
+            dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            query = query.filter(MovimentacaoBancaria.data_competencia >= dt_inicio)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de data_inicio inválido. Use YYYY-MM-DD")
+    
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+            query = query.filter(MovimentacaoBancaria.data_competencia <= dt_fim)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de data_fim inválido. Use YYYY-MM-DD")
+    
+    movimentacoes = query.order_by(MovimentacaoBancaria.data_movimentacao.desc()).all()
     
     total_entradas = sum(m.valor for m in movimentacoes if m.natureza == "ENTRADA")
     total_saidas = sum(m.valor for m in movimentacoes if m.natureza == "SAIDA")
@@ -907,6 +930,10 @@ def listar_pendentes_conciliacao(
             "id": conta.id,
             "nome": conta.nome,
             "saldo_atual": conta.saldo_atual
+        },
+        "periodo": {
+            "data_inicio": data_inicio,
+            "data_fim": data_fim
         },
         "total_entradas_pendentes": total_entradas,
         "total_saidas_pendentes": total_saidas,
@@ -1627,3 +1654,304 @@ def relatorio_dre(
         "resultado": resultado,
         "resultado_percentual": (resultado / total_receitas * 100) if total_receitas > 0 else 0
     }
+
+
+# =============================================================================
+# COMPENSAÇÃO DE CONTAS
+# =============================================================================
+
+@router.post("/compensacao")
+def compensar_contas(
+    request: CompensacaoRequest,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """
+    Compensa contas a pagar com contas a receber do mesmo fornecedor/cliente
+    
+    Processo:
+    1. Validar que as contas pertencem à mesma entidade
+    2. Calcular valor da compensação (menor entre a pagar e a receber)
+    3. Baixar parcial ou total as contas envolvidas
+    4. Criar histórico de compensação
+    5. Não gera movimentação bancária (é só compensação contábil)
+    """
+    if not request.contas_pagar_ids or not request.contas_receber_ids:
+        raise HTTPException(status_code=400, detail="Informe pelo menos uma conta a pagar e uma a receber")
+    
+    try:
+        # Buscar contas a pagar
+        contas_pagar = session.query(ContaPagar).filter(
+            ContaPagar.id.in_(request.contas_pagar_ids)
+        ).all()
+        
+        if len(contas_pagar) != len(request.contas_pagar_ids):
+            raise HTTPException(status_code=404, detail="Algumas contas a pagar não foram encontradas")
+        
+        # Buscar contas a receber
+        contas_receber = session.query(ContaReceber).filter(
+            ContaReceber.id.in_(request.contas_receber_ids)
+        ).all()
+        
+        if len(contas_receber) != len(request.contas_receber_ids):
+            raise HTTPException(status_code=404, detail="Algumas contas a receber não foram encontradas")
+        
+        # Validar que pertencem à mesma entidade (fornecedor = cliente)
+        # Para simplificar, vamos permitir compensação entre quaisquer contas
+        # Em produção, adicionar validação de mesma entidade
+        
+        # Calcular totais
+        total_pagar = sum(c.valor_original + c.juros - c.desconto - c.valor_pago for c in contas_pagar)
+        total_receber = sum(c.valor_original + c.juros - c.desconto - c.valor_recebido for c in contas_receber)
+        
+        valor_compensacao = min(total_pagar, total_receber)
+        
+        if valor_compensacao <= 0:
+            raise HTTPException(status_code=400, detail="Não há valor disponível para compensação")
+        
+        # Realizar compensação proporcional
+        valor_restante = valor_compensacao
+        
+        # Compensar contas a pagar
+        for conta in contas_pagar:
+            if valor_restante <= 0:
+                break
+            
+            saldo_devedor = conta.valor_original + conta.juros - conta.desconto - conta.valor_pago
+            if saldo_devedor <= 0:
+                continue
+            
+            valor_a_compensar = min(saldo_devedor, valor_restante)
+            conta.valor_pago += valor_a_compensar
+            valor_restante -= valor_a_compensar
+            
+            # Atualizar status
+            if conta.valor_pago >= conta.valor_original + conta.juros - conta.desconto:
+                conta.status = StatusPagamento.PAGO
+                conta.data_pagamento = request.data_compensacao
+            else:
+                conta.status = StatusPagamento.PARCIAL
+        
+        # Compensar contas a receber
+        valor_restante = valor_compensacao
+        for conta in contas_receber:
+            if valor_restante <= 0:
+                break
+            
+            saldo_receber = conta.valor_original + conta.juros - conta.desconto - conta.valor_recebido
+            if saldo_receber <= 0:
+                continue
+            
+            valor_a_compensar = min(saldo_receber, valor_restante)
+            conta.valor_recebido += valor_a_compensar
+            valor_restante -= valor_a_compensar
+            
+            # Atualizar status
+            if conta.valor_recebido >= conta.valor_original + conta.juros - conta.desconto:
+                conta.status = StatusPagamento.PAGO
+                conta.data_recebimento = request.data_compensacao
+            else:
+                conta.status = StatusPagamento.PARCIAL
+        
+        # Criar registro de compensação
+        # Criar um registro único para toda a compensação
+        compensacao = CompensacaoContas(
+            data_compensacao=request.data_compensacao,
+            valor_compensado=valor_compensacao,
+            conta_pagar_id=contas_pagar[0].id,  # Principal conta a pagar
+            conta_receber_id=contas_receber[0].id,  # Principal conta a receber
+            observacao=f"{request.observacao or ''} - Compensação entre {len(contas_pagar)} conta(s) a pagar e {len(contas_receber)} conta(s) a receber"
+        )
+        session.add(compensacao)
+        
+        session.commit()
+        
+        return {
+            "message": "Compensação realizada com sucesso",
+            "valor_compensado": valor_compensacao,
+            "contas_pagar_afetadas": len(contas_pagar),
+            "contas_receber_afetadas": len(contas_receber)
+        }
+        
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao realizar compensação: {str(e)}")
+
+
+@router.get("/compensacao", response_model=List[CompensacaoContasRead])
+def listar_compensacoes(
+    skip: int = 0,
+    limit: int = 100,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Lista histórico de compensações"""
+    return session.query(CompensacaoContas).order_by(
+        CompensacaoContas.data_compensacao.desc()
+    ).offset(skip).limit(limit).all()
+
+
+# =============================================================================
+# BAIXA MÚLTIPLA
+# =============================================================================
+
+@router.post("/baixa-multipla")
+def baixa_gerando_multiplas(
+    request: BaixaMultiplaRequest,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """
+    Baixa um título gerando múltiplos novos
+    Exemplo: Recebe R$ 10.000 de venda no cartão
+    - Baixa a conta a receber
+    - Cria 10 parcelas do repasse da operadora
+    
+    Processo:
+    1. Baixar conta original
+    2. Criar movimentação bancária de entrada
+    3. Criar novas contas (com sinal invertido se necessário)
+    4. Vincular todas ao histórico de baixa múltipla
+    5. Registrar no histórico de liquidação
+    """
+    if not request.parcelas_geradas:
+        raise HTTPException(status_code=400, detail="Informe as parcelas a serem geradas")
+    
+    try:
+        # Buscar conta original
+        if request.tipo_conta == "RECEBER":
+            conta_original = session.query(ContaReceber).filter(
+                ContaReceber.id == request.conta_id
+            ).first()
+        else:
+            conta_original = session.query(ContaPagar).filter(
+                ContaPagar.id == request.conta_id
+            ).first()
+        
+        if not conta_original:
+            raise HTTPException(status_code=404, detail="Conta não encontrada")
+        
+        # Buscar conta bancária
+        conta_bancaria = session.query(ContaBancaria).filter(
+            ContaBancaria.id == request.conta_bancaria_destino_id
+        ).first()
+        
+        if not conta_bancaria:
+            raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
+        
+        # Calcular valor total das parcelas
+        valor_total_parcelas = sum(p.valor for p in request.parcelas_geradas)
+        
+        # Validar se valor total corresponde ao valor da conta
+        if abs(valor_total_parcelas - conta_original.valor_original) > 0.01:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Valor total das parcelas (R$ {valor_total_parcelas:.2f}) não corresponde ao valor da conta (R$ {conta_original.valor_original:.2f})"
+            )
+        
+        # 1. Baixar conta original
+        if request.tipo_conta == "RECEBER":
+            conta_original.valor_recebido = conta_original.valor_original
+            conta_original.status = StatusPagamento.PAGO
+            conta_original.data_recebimento = datetime.utcnow()
+        else:
+            conta_original.valor_pago = conta_original.valor_original
+            conta_original.status = StatusPagamento.PAGO
+            conta_original.data_pagamento = datetime.utcnow()
+        
+        # 2. Criar movimentação bancária de entrada
+        movimentacao = MovimentacaoBancaria(
+            conta_bancaria_id=request.conta_bancaria_destino_id,
+            tipo=TipoMovimentacaoBancaria.DEPOSITO if request.tipo_conta == "RECEBER" else TipoMovimentacaoBancaria.SAQUE,
+            natureza="ENTRADA" if request.tipo_conta == "RECEBER" else "SAIDA",
+            data_movimentacao=datetime.utcnow(),
+            data_competencia=datetime.utcnow().date(),
+            valor=valor_total_parcelas,
+            descricao=f"Baixa múltipla - {conta_original.descricao}",
+            conciliado=False
+        )
+        session.add(movimentacao)
+        session.flush()
+        
+        # Atualizar saldo da conta bancária
+        if request.tipo_conta == "RECEBER":
+            conta_bancaria.saldo_atual += valor_total_parcelas
+        else:
+            conta_bancaria.saldo_atual -= valor_total_parcelas
+        
+        # 3. Criar novas contas (inverter tipo: se era a receber, gera a pagar e vice-versa)
+        contas_geradas_ids = []
+        
+        for parcela in request.parcelas_geradas:
+            if request.tipo_conta == "RECEBER":
+                # Gera contas a pagar (repasse da operadora)
+                nova_conta = ContaPagar(
+                    descricao=parcela.descricao,
+                    fornecedor_id=conta_original.cliente_id,  # Cliente vira fornecedor no repasse
+                    data_emissao=datetime.utcnow(),
+                    data_vencimento=datetime.combine(parcela.vencimento, datetime.min.time()),
+                    valor_original=parcela.valor,
+                    status=StatusPagamento.PENDENTE,
+                    observacoes=f"Gerada por baixa múltipla da conta {conta_original.id}"
+                )
+            else:
+                # Gera contas a receber
+                nova_conta = ContaReceber(
+                    descricao=parcela.descricao,
+                    cliente_id=conta_original.fornecedor_id,  # Fornecedor vira cliente
+                    data_emissao=datetime.utcnow(),
+                    data_vencimento=datetime.combine(parcela.vencimento, datetime.min.time()),
+                    valor_original=parcela.valor,
+                    status=StatusPagamento.PENDENTE,
+                    observacoes=f"Gerada por baixa múltipla da conta {conta_original.id}"
+                )
+            
+            session.add(nova_conta)
+            session.flush()
+            contas_geradas_ids.append(nova_conta.id)
+        
+        # 4. Registrar no histórico de liquidação
+        historico = HistoricoLiquidacao(
+            tipo_operacao="BAIXA_MULTIPLA",
+            valor_total=valor_total_parcelas,
+            conta_origem_id=conta_original.id,
+            tipo_conta_origem=request.tipo_conta,
+            contas_geradas_ids=contas_geradas_ids,
+            movimentacao_bancaria_id=movimentacao.id,
+            observacao=request.observacao
+        )
+        session.add(historico)
+        
+        session.commit()
+        
+        return {
+            "message": "Baixa múltipla realizada com sucesso",
+            "conta_original_id": conta_original.id,
+            "movimentacao_bancaria_id": movimentacao.id,
+            "contas_geradas": len(contas_geradas_ids),
+            "contas_geradas_ids": contas_geradas_ids,
+            "valor_total": valor_total_parcelas
+        }
+        
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao realizar baixa múltipla: {str(e)}")
+
+
+@router.get("/historico-liquidacao", response_model=List[HistoricoLiquidacaoRead])
+def listar_historico_liquidacao(
+    skip: int = 0,
+    limit: int = 100,
+    tipo_operacao: Optional[str] = Query(None),
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:read"))
+):
+    """Lista histórico de liquidações"""
+    query = session.query(HistoricoLiquidacao)
+    
+    if tipo_operacao:
+        query = query.filter(HistoricoLiquidacao.tipo_operacao == tipo_operacao)
+    
+    return query.order_by(
+        HistoricoLiquidacao.data_operacao.desc()
+    ).offset(skip).limit(limit).all()

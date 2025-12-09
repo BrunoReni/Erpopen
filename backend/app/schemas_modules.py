@@ -625,6 +625,80 @@ class CategoriaFinanceiraRead(CategoriaFinanceiraBase):
         from_attributes = True
 
 
+# Compensação de Contas
+class CompensacaoContasCreate(BaseModel):
+    data_compensacao: date
+    valor_compensado: float
+    conta_pagar_id: int
+    conta_receber_id: int
+    observacao: Optional[str] = None
+
+
+class CompensacaoContasRead(BaseModel):
+    id: int
+    data_compensacao: date
+    valor_compensado: float
+    conta_pagar_id: int
+    conta_receber_id: int
+    observacao: Optional[str] = None
+    created_at: datetime
+    created_by: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Histórico de Liquidação
+class HistoricoLiquidacaoCreate(BaseModel):
+    tipo_operacao: str  # COMPENSACAO, BAIXA_MULTIPLA, BAIXA_SIMPLES
+    valor_total: float
+    conta_origem_id: int
+    tipo_conta_origem: str  # PAGAR ou RECEBER
+    contas_geradas_ids: Optional[List[int]] = None
+    movimentacao_bancaria_id: Optional[int] = None
+    observacao: Optional[str] = None
+
+
+class HistoricoLiquidacaoRead(BaseModel):
+    id: int
+    tipo_operacao: str
+    data_operacao: datetime
+    valor_total: float
+    conta_origem_id: int
+    tipo_conta_origem: str
+    contas_geradas_ids: Optional[List[int]] = None
+    movimentacao_bancaria_id: Optional[int] = None
+    observacao: Optional[str] = None
+    created_by: Optional[int] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# Baixa Múltipla Request
+class ParcelaGerada(BaseModel):
+    valor: float
+    vencimento: date
+    descricao: str
+
+
+class BaixaMultiplaRequest(BaseModel):
+    conta_id: int
+    tipo_conta: str  # "PAGAR" ou "RECEBER"
+    parcelas_geradas: List[ParcelaGerada]
+    conta_bancaria_destino_id: int
+    observacao: Optional[str] = None
+
+
+# Compensação Request
+class CompensacaoRequest(BaseModel):
+    contas_pagar_ids: List[int]
+    contas_receber_ids: List[int]
+    data_compensacao: date
+    observacao: Optional[str] = None
+
+
 # =============================================================================
 # MÓDULO DE MATERIAIS - SCHEMAS
 # =============================================================================

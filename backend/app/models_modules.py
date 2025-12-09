@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint, Date, Boolean, Index
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum as SQLEnum, UniqueConstraint, Date, Boolean, Index, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -473,6 +473,42 @@ class CategoriaFinanceira(Base):
     
     # Relacionamentos
     subcategorias = relationship("CategoriaFinanceira", remote_side=[id])
+
+
+class CompensacaoContas(Base):
+    __tablename__ = "compensacoes_contas"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    data_compensacao = Column(Date, nullable=False)
+    valor_compensado = Column(Float, nullable=False)
+    conta_pagar_id = Column(Integer, ForeignKey("contas_pagar.id"), nullable=False)
+    conta_receber_id = Column(Integer, ForeignKey("contas_receber.id"), nullable=False)
+    observacao = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Relacionamentos
+    conta_pagar = relationship("ContaPagar")
+    conta_receber = relationship("ContaReceber")
+
+
+class HistoricoLiquidacao(Base):
+    __tablename__ = "historico_liquidacao"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tipo_operacao = Column(String, nullable=False)  # COMPENSACAO, BAIXA_MULTIPLA, BAIXA_SIMPLES
+    data_operacao = Column(DateTime, default=datetime.utcnow)
+    valor_total = Column(Float, nullable=False)
+    conta_origem_id = Column(Integer, nullable=False)
+    tipo_conta_origem = Column(String, nullable=False)  # PAGAR ou RECEBER
+    contas_geradas_ids = Column(JSON, nullable=True)  # Array de IDs de contas geradas
+    movimentacao_bancaria_id = Column(Integer, ForeignKey("movimentacoes_bancarias.id"), nullable=True)
+    observacao = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    movimentacao_bancaria = relationship("MovimentacaoBancaria")
 
 
 # =============================================================================
