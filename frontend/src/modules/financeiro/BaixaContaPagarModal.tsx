@@ -9,11 +9,24 @@ interface ContaBancaria {
   saldo_atual: number;
 }
 
+interface ContaPagar {
+  id: number;
+  descricao: string;
+  fornecedor_id: number;
+  data_vencimento: string;
+  valor_original: number;
+  valor_pago: number;
+  juros: number;
+  desconto: number;
+  status: string;
+  observacoes?: string;
+}
+
 interface BaixaContaPagarModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  conta: any;
+  conta: ContaPagar | null;
 }
 
 export function BaixaContaPagarModal({ isOpen, onClose, onSuccess, conta }: BaixaContaPagarModalProps) {

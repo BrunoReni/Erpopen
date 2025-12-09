@@ -8,8 +8,7 @@ import { BaixaContaReceberModal } from './BaixaContaReceberModal';
 interface ContaReceber {
   id: number;
   descricao: string;
-  cliente: string;
-  cliente_nome: string;
+  cliente_nome?: string;
   data_vencimento: string;
   valor_original: number;
   valor_recebido: number;
@@ -76,7 +75,6 @@ export function ContasReceberList() {
 
   const filteredContas = contas.filter(c =>
     c.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (c.cliente && c.cliente.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (c.cliente_nome && c.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -163,7 +161,7 @@ export function ContasReceberList() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{conta.cliente_nome || conta.cliente || 'N/A'}</div>
+                      <div className="text-sm text-gray-900">{conta.cliente_nome || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">

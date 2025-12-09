@@ -9,11 +9,25 @@ interface ContaBancaria {
   saldo_atual: number;
 }
 
+interface ContaReceber {
+  id: number;
+  descricao: string;
+  cliente_id: number;
+  cliente_nome?: string;
+  data_vencimento: string;
+  valor_original: number;
+  valor_recebido: number;
+  juros: number;
+  desconto: number;
+  status: string;
+  observacoes?: string;
+}
+
 interface BaixaContaReceberModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  conta: any;
+  conta: ContaReceber | null;
 }
 
 export function BaixaContaReceberModal({ isOpen, onClose, onSuccess, conta }: BaixaContaReceberModalProps) {
