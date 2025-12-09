@@ -383,6 +383,26 @@ class ContaReceberRead(ContaReceberBase):
         from_attributes = True
 
 
+# Baixa Conta a Pagar
+class BaixaContaPagar(BaseModel):
+    valor_pago: float
+    juros: Optional[float] = 0.0
+    desconto: Optional[float] = 0.0
+    conta_bancaria_id: int
+    data_pagamento: Optional[datetime] = None
+    observacoes: Optional[str] = None
+
+
+# Baixa Conta a Receber
+class BaixaContaReceber(BaseModel):
+    valor_recebido: float
+    juros: Optional[float] = 0.0
+    desconto: Optional[float] = 0.0
+    conta_bancaria_id: int
+    data_recebimento: Optional[datetime] = None
+    observacoes: Optional[str] = None
+
+
 # =============================================================================
 # MÓDULO DE MATERIAIS - SCHEMAS
 # =============================================================================
