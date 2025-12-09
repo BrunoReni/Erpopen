@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+
+// Constants
+const FLOAT_PRECISION_THRESHOLD = 0.01;
 
 interface Parcela {
   descricao: string;
@@ -29,6 +33,7 @@ interface ContaBancaria {
 }
 
 export function LiquidacaoForm() {
+  const navigate = useNavigate();
   const [tipoConta, setTipoConta] = useState<'RECEBER' | 'PAGAR'>('RECEBER');
   const [contas, setContas] = useState<ContaOriginal[]>([]);
   const [contaSelecionadaId, setContaSelecionadaId] = useState<number>(0);
@@ -89,7 +94,7 @@ export function LiquidacaoForm() {
   const totalParcelas = parcelas.reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
   const valorOriginal = contaSelecionada?.valor_original || 0;
   const diferenca = totalParcelas - valorOriginal;
-  const valoresCorrespondentes = Math.abs(diferenca) < 0.01;
+  const valoresCorrespondentes = Math.abs(diferenca) < FLOAT_PRECISION_THRESHOLD;
 
   const addParcela = () => {
     const valorRestante = valorOriginal - totalParcelas;
@@ -412,7 +417,10 @@ export function LiquidacaoForm() {
                             type="number"
                             step="0.01"
                             value={parcela.valor || ''}
-                            onChange={(e) => updateParcela(index, 'valor', parseFloat(e.target.value) || 0)}
+                            onChange={(e) => {
+                              const value = e.target.value === '' ? 0 : Number(e.target.value);
+                              updateParcela(index, 'valor', isNaN(value) ? 0 : value);
+                            }}
                             placeholder="0,00"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
                             required
@@ -500,7 +508,7 @@ export function LiquidacaoForm() {
               </button>
               <button
                 type="button"
-                onClick={() => window.location.href = '/financeiro'}
+                onClick={() => navigate('/financeiro')}
                 className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
                 Cancelar
