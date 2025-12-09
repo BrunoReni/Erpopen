@@ -26,6 +26,7 @@ import { MovimentosEstoqueList } from './modules/materiais/MovimentosEstoqueList
 import LocaisEstoqueList from './modules/materiais/LocaisEstoqueList';
 import NotasFiscaisList from './modules/vendas/NotasFiscaisList';
 import { UsersList } from './modules/users/UsersList';
+import { IntegrationDashboard } from './modules/dev/IntegrationDashboard';
 import './App.css';
 
 function App() {
@@ -261,6 +262,15 @@ function App() {
             element={
               <ProtectedRoute requiredPermissions={['users:read']}>
                 <UsersList />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/dev/integration"
+            element={
+              <ProtectedRoute requiredPermissions={['admin:read']}>
+                <IntegrationDashboard />
               </ProtectedRoute>
             }
           />

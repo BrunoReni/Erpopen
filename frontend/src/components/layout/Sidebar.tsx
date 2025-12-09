@@ -10,7 +10,8 @@ import {
   ShoppingCart, 
   FileText,
   Settings,
-  LogOut
+  LogOut,
+  Wrench
 } from 'lucide-react';
 import type { MenuItem } from '../../types';
 
@@ -70,6 +71,13 @@ export function Sidebar() {
       path: '/reports',
       requiredPermissions: ['reports:read']
     },
+    { 
+      id: 'dev', 
+      label: '🔧 Dev Tools', 
+      icon: 'wrench', 
+      path: '/dev/integration',
+      requiredPermissions: ['admin:read']
+    },
   ];
 
   const getIcon = (iconName: string) => {
@@ -81,6 +89,7 @@ export function Sidebar() {
       'file-text': FileText,
       'dollar-sign': () => <span className="text-xl">$</span>,
       settings: Settings,
+      wrench: Wrench,
     };
     const Icon = icons[iconName] || LayoutDashboard;
     return typeof Icon === 'function' ? <Icon /> : <Icon className="w-5 h-5" />;
