@@ -75,8 +75,9 @@ export function IntegrationDashboard() {
       
       setFeatures(featuresRes.data.features);
       setStats(statsRes.data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Erro ao carregar dados');
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Erro ao carregar dados');
       console.error('Error loading dev tools data:', err);
     } finally {
       setLoading(false);

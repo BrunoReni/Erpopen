@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     name: Check Feature Completeness
     
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

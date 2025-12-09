@@ -261,14 +261,14 @@ FEATURES_REGISTRY: List[Feature] = [
         doc_files=["MODULO_FINANCEIRO_AVANCADO.md"]
     ),
     
-    # FINANCEIRO - Feature com GAP (Issue #16)
+    # FINANCEIRO - Feature with GAP (Issue #16)
     Feature(
         id="fin_compensacao_liquidacao",
         name="Compensação/Liquidação de Contas",
         module="financeiro",
         description="Sistema de compensação e liquidação de contas a pagar/receber",
         has_backend=True,
-        has_frontend=False,  # ❌ FALTA FRONTEND
+        has_frontend=False,  # ❌ MISSING FRONTEND
         has_tests=False,
         has_docs=True,
         backend_endpoints=[
@@ -277,7 +277,7 @@ FEATURES_REGISTRY: List[Feature] = [
             "POST /financeiro/liquidacao",
             "GET /financeiro/historico-liquidacao"
         ],
-        frontend_components=[],  # ❌ VAZIO
+        frontend_components=[],  # ❌ EMPTY
         test_files=[],
         doc_files=["MODULO_FINANCEIRO_AVANCADO.md"],
         issue_number=16,

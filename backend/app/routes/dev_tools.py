@@ -98,7 +98,7 @@ def get_module_features(
     if not features:
         raise HTTPException(
             status_code=404,
-            detail=f"Nenhuma feature encontrada para o módulo '{module}'"
+            detail=f"No features found for module '{module}'"
         )
     
     complete = len([f for f in features if f.status == FeatureStatus.COMPLETE])
@@ -141,7 +141,7 @@ def list_all_features(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Status inválido. Valores válidos: {[s.value for s in FeatureStatus]}"
+                detail=f"Invalid status. Valid values: {[s.value for s in FeatureStatus]}"
             )
     
     return {
