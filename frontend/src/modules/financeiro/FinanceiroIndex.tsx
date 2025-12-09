@@ -1,6 +1,6 @@
 import { MainLayout } from '../../components/layout/MainLayout';
 import { Link } from 'react-router-dom';
-import { DollarSign, CreditCard, Building2, Target, ArrowLeftRight, Receipt, CheckSquare } from 'lucide-react';
+import { DollarSign, CreditCard, Building2, Target, ArrowLeftRight, Receipt, CheckSquare, Split, History } from 'lucide-react';
 
 export function FinanceiroIndex() {
   const modules = [
@@ -52,6 +52,20 @@ export function FinanceiroIndex() {
       icon: CheckSquare,
       path: '/financeiro/conciliacao',
       color: 'bg-teal-500'
+    },
+    {
+      title: 'Baixa Múltipla',
+      description: 'Baixar título gerando parcelas',
+      icon: Split,
+      path: '/financeiro/liquidacao',
+      color: 'bg-purple-500'
+    },
+    {
+      title: 'Histórico de Liquidações',
+      description: 'Consultar operações realizadas',
+      icon: History,
+      path: '/financeiro/historico-liquidacao',
+      color: 'bg-slate-500'
     }
   ];
 
