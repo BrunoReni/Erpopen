@@ -108,7 +108,14 @@ class FornecedorBase(BaseModel):
 
 
 class FornecedorCreate(FornecedorBase):
-    pass
+    @field_validator('cnpj')
+    @classmethod
+    def validate_cnpj(cls, v):
+        if v:
+            from app.utils.validators import validate_cnpj
+            if not validate_cnpj(v):
+                raise ValueError('CNPJ inválido')
+        return v
 
 
 class FornecedorUpdate(BaseModel):
@@ -122,6 +129,15 @@ class FornecedorUpdate(BaseModel):
     estado: Optional[str] = None
     cep: Optional[str] = None
     ativo: Optional[int] = None
+    
+    @field_validator('cnpj')
+    @classmethod
+    def validate_cnpj(cls, v):
+        if v:
+            from app.utils.validators import validate_cnpj
+            if not validate_cnpj(v):
+                raise ValueError('CNPJ inválido')
+        return v
 
 
 class FornecedorRead(FornecedorBase):
@@ -724,7 +740,14 @@ class ClienteBase(BaseModel):
 
 
 class ClienteCreate(ClienteBase):
-    pass
+    @field_validator('cpf_cnpj')
+    @classmethod
+    def validate_cpf_cnpj(cls, v):
+        if v:
+            from app.utils.validators import validate_cpf_cnpj
+            if not validate_cpf_cnpj(v):
+                raise ValueError('CPF/CNPJ inválido')
+        return v
 
 
 class ClienteUpdate(BaseModel):
@@ -746,6 +769,15 @@ class ClienteUpdate(BaseModel):
     limite_credito: Optional[float] = None
     dias_vencimento: Optional[int] = None
     ativo: Optional[int] = None
+    
+    @field_validator('cpf_cnpj')
+    @classmethod
+    def validate_cpf_cnpj(cls, v):
+        if v:
+            from app.utils.validators import validate_cpf_cnpj
+            if not validate_cpf_cnpj(v):
+                raise ValueError('CPF/CNPJ inválido')
+        return v
 
 
 class ClienteRead(ClienteBase):
