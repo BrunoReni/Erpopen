@@ -342,6 +342,8 @@ class ContaPagarRead(ContaPagarBase):
     data_emissao: datetime
     data_pagamento: Optional[datetime]
     valor_pago: float
+    juros: float
+    desconto: float
     status: StatusPagamento
     created_at: datetime
     
@@ -376,6 +378,8 @@ class ContaReceberRead(ContaReceberBase):
     data_emissao: datetime
     data_recebimento: Optional[datetime]
     valor_recebido: float
+    juros: float
+    desconto: float
     status: StatusPagamento
     created_at: datetime
     

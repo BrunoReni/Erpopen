@@ -15,7 +15,8 @@ from app.schemas_modules import (
 )
 from app.models_modules import (
     ContaBancaria, CentroCusto, ContaPagar, ContaReceber,
-    MovimentacaoBancaria, SaldoDiario, TipoMovimentacaoBancaria
+    MovimentacaoBancaria, SaldoDiario, TipoMovimentacaoBancaria,
+    StatusPagamento
 )
 
 router = APIRouter()
