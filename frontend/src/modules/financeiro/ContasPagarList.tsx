@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Plus, Search, Edit } from 'lucide-react';
+import { Plus, Search, Edit, DollarSign } from 'lucide-react';
 import axios from 'axios';
 import { ContaPagarForm } from './ContaPagarForm';
+import { BaixaContaPagarModal } from './BaixaContaPagarModal';
 
 interface ContaPagar {
   id: number;
@@ -11,6 +12,8 @@ interface ContaPagar {
   data_vencimento: string;
   valor_original: number;
   valor_pago: number;
+  juros: number;
+  desconto: number;
   status: string;
   observacoes: string;
 }
@@ -21,6 +24,8 @@ export function ContasPagarList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaPagar | null>(null);
+  const [isBaixaModalOpen, setIsBaixaModalOpen] = useState(false);
+  const [contaBaixar, setContaBaixar] = useState<ContaPagar | null>(null);
 
   useEffect(() => {
     loadContas();
@@ -45,12 +50,26 @@ export function ContasPagarList() {
     setIsFormOpen(true);
   };
 
+  const handleBaixar = (conta: ContaPagar) => {
+    setContaBaixar(conta);
+    setIsBaixaModalOpen(true);
+  };
+
   const handleFormClose = () => {
     setIsFormOpen(false);
     setEditingConta(null);
   };
 
+  const handleBaixaModalClose = () => {
+    setIsBaixaModalOpen(false);
+    setContaBaixar(null);
+  };
+
   const handleFormSuccess = () => {
+    loadContas();
+  };
+
+  const handleBaixaSuccess = () => {
     loadContas();
   };
 
@@ -64,6 +83,8 @@ export function ContasPagarList() {
         return 'bg-green-100 text-green-800';
       case 'pendente':
         return 'bg-yellow-100 text-yellow-800';
+      case 'parcial':
+        return 'bg-blue-100 text-blue-800';
       case 'atrasado':
         return 'bg-red-100 text-red-800';
       default:
@@ -158,12 +179,24 @@ export function ContasPagarList() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button 
-                        onClick={() => handleEdit(conta)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Edit size={18} />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        {conta.status !== 'pago' && (
+                          <button 
+                            onClick={() => handleBaixar(conta)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Baixar conta"
+                          >
+                            <DollarSign size={18} />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleEdit(conta)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Editar conta"
+                        >
+                          <Edit size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -178,6 +211,13 @@ export function ContasPagarList() {
         onClose={handleFormClose}
         onSuccess={handleFormSuccess}
         conta={editingConta}
+      />
+
+      <BaixaContaPagarModal
+        isOpen={isBaixaModalOpen}
+        onClose={handleBaixaModalClose}
+        onSuccess={handleBaixaSuccess}
+        conta={contaBaixar}
       />
     </MainLayout>
   );

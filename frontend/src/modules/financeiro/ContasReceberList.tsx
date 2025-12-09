@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Plus, Search, Edit } from 'lucide-react';
+import { Plus, Search, Edit, DollarSign } from 'lucide-react';
 import axios from 'axios';
 import { ContaReceberForm } from './ContaReceberForm';
+import { BaixaContaReceberModal } from './BaixaContaReceberModal';
 
 interface ContaReceber {
   id: number;
   descricao: string;
   cliente: string;
+  cliente_nome: string;
   data_vencimento: string;
   valor_original: number;
   valor_recebido: number;
+  juros: number;
+  desconto: number;
   status: string;
   observacoes: string;
 }
@@ -21,6 +25,8 @@ export function ContasReceberList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaReceber | null>(null);
+  const [isBaixaModalOpen, setIsBaixaModalOpen] = useState(false);
+  const [contaBaixar, setContaBaixar] = useState<ContaReceber | null>(null);
 
   useEffect(() => {
     loadContas();
@@ -45,18 +51,33 @@ export function ContasReceberList() {
     setIsFormOpen(true);
   };
 
+  const handleBaixar = (conta: ContaReceber) => {
+    setContaBaixar(conta);
+    setIsBaixaModalOpen(true);
+  };
+
   const handleFormClose = () => {
     setIsFormOpen(false);
     setEditingConta(null);
+  };
+
+  const handleBaixaModalClose = () => {
+    setIsBaixaModalOpen(false);
+    setContaBaixar(null);
   };
 
   const handleFormSuccess = () => {
     loadContas();
   };
 
+  const handleBaixaSuccess = () => {
+    loadContas();
+  };
+
   const filteredContas = contas.filter(c =>
     c.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.cliente.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.cliente && c.cliente.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (c.cliente_nome && c.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStatusColor = (status: string) => {
@@ -65,6 +86,8 @@ export function ContasReceberList() {
         return 'bg-green-100 text-green-800';
       case 'pendente':
         return 'bg-yellow-100 text-yellow-800';
+      case 'parcial':
+        return 'bg-blue-100 text-blue-800';
       case 'atrasado':
         return 'bg-red-100 text-red-800';
       default:
@@ -140,7 +163,7 @@ export function ContasReceberList() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{conta.cliente}</div>
+                      <div className="text-sm text-gray-900">{conta.cliente_nome || conta.cliente || 'N/A'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
@@ -163,12 +186,24 @@ export function ContasReceberList() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button 
-                        onClick={() => handleEdit(conta)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        <Edit size={18} />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        {conta.status !== 'pago' && (
+                          <button 
+                            onClick={() => handleBaixar(conta)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Baixar conta"
+                          >
+                            <DollarSign size={18} />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleEdit(conta)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Editar conta"
+                        >
+                          <Edit size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -183,6 +218,13 @@ export function ContasReceberList() {
         onClose={handleFormClose}
         onSuccess={handleFormSuccess}
         conta={editingConta}
+      />
+
+      <BaixaContaReceberModal
+        isOpen={isBaixaModalOpen}
+        onClose={handleBaixaModalClose}
+        onSuccess={handleBaixaSuccess}
+        conta={contaBaixar}
       />
     </MainLayout>
   );
