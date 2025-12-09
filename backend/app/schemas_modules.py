@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
+from app.utils.validators import validate_cpf, validate_cnpj, validate_cpf_cnpj
 
 
 # =============================================================================
@@ -110,11 +111,9 @@ class FornecedorBase(BaseModel):
 class FornecedorCreate(FornecedorBase):
     @field_validator('cnpj')
     @classmethod
-    def validate_cnpj(cls, v):
-        if v:
-            from app.utils.validators import validate_cnpj
-            if not validate_cnpj(v):
-                raise ValueError('CNPJ inválido')
+    def validate_cnpj_field(cls, v):
+        if v and not validate_cnpj(v):
+            raise ValueError('CNPJ inválido')
         return v
 
 
@@ -132,11 +131,9 @@ class FornecedorUpdate(BaseModel):
     
     @field_validator('cnpj')
     @classmethod
-    def validate_cnpj(cls, v):
-        if v:
-            from app.utils.validators import validate_cnpj
-            if not validate_cnpj(v):
-                raise ValueError('CNPJ inválido')
+    def validate_cnpj_field(cls, v):
+        if v and not validate_cnpj(v):
+            raise ValueError('CNPJ inválido')
         return v
 
 
@@ -742,11 +739,9 @@ class ClienteBase(BaseModel):
 class ClienteCreate(ClienteBase):
     @field_validator('cpf_cnpj')
     @classmethod
-    def validate_cpf_cnpj(cls, v):
-        if v:
-            from app.utils.validators import validate_cpf_cnpj
-            if not validate_cpf_cnpj(v):
-                raise ValueError('CPF/CNPJ inválido')
+    def validate_cpf_cnpj_field(cls, v):
+        if v and not validate_cpf_cnpj(v):
+            raise ValueError('CPF/CNPJ inválido')
         return v
 
 
@@ -772,11 +767,9 @@ class ClienteUpdate(BaseModel):
     
     @field_validator('cpf_cnpj')
     @classmethod
-    def validate_cpf_cnpj(cls, v):
-        if v:
-            from app.utils.validators import validate_cpf_cnpj
-            if not validate_cpf_cnpj(v):
-                raise ValueError('CPF/CNPJ inválido')
+    def validate_cpf_cnpj_field(cls, v):
+        if v and not validate_cpf_cnpj(v):
+            raise ValueError('CPF/CNPJ inválido')
         return v
 
 

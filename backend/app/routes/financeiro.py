@@ -1030,7 +1030,8 @@ def create_conta_pagar_parcelada(
     session.flush()
     
     # Criar parcelas
-    valor_parcela = conta.valor_total / conta.quantidade_parcelas
+    # NOTE: Using simple division for now. For production, consider using Decimal for precise financial calculations
+    valor_parcela = round(conta.valor_total / conta.quantidade_parcelas, 2)
     for i in range(conta.quantidade_parcelas):
         data_vencimento = conta.data_primeira_parcela + timedelta(days=i * conta.intervalo_dias)
         parcela = ParcelaContaPagar(
@@ -1076,7 +1077,8 @@ def create_conta_receber_parcelada(
     session.flush()
     
     # Criar parcelas
-    valor_parcela = conta.valor_total / conta.quantidade_parcelas
+    # NOTE: Using simple division for now. For production, consider using Decimal for precise financial calculations
+    valor_parcela = round(conta.valor_total / conta.quantidade_parcelas, 2)
     for i in range(conta.quantidade_parcelas):
         data_vencimento = conta.data_primeira_parcela + timedelta(days=i * conta.intervalo_dias)
         parcela = ParcelaContaReceber(
