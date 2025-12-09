@@ -92,6 +92,8 @@ def init_default_permissions_and_roles(db: Session):
         "financeiro": ["create", "read", "update", "delete"],
         "materiais": ["create", "read", "update", "delete"],
         "reports": ["read", "export"],
+        "admin": ["read"],  # Admin permission for dev tools and system administration
+        "vendas": ["create", "read", "update", "delete"],  # Sales module permissions
     }
     
     # Create permissions

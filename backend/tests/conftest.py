@@ -79,6 +79,7 @@ def admin_user(db_session):
         Permission(module="vendas", action="update"),
         Permission(module="vendas", action="delete"),
         Permission(module="dashboard", action="read"),
+        Permission(module="admin", action="read"),  # Admin permission for dev tools
     ]
     
     for perm in permissions:
