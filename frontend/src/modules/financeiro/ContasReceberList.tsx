@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '../../components/layout/MainLayout';
-import { Plus, Search, Edit, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit, DollarSign, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 import axios from 'axios';
 import { ContaReceberForm } from './ContaReceberForm';
 import { BaixaContaReceberModal } from './BaixaContaReceberModal';
+import { ParcelamentoForm } from './ParcelamentoForm';
+import { ParcelasTable } from './ParcelasTable';
+
+interface Parcela {
+  id: number;
+  numero_parcela: number;
+  total_parcelas: number;
+  data_vencimento: string;
+  valor: number;
+  valor_recebido: number;
+  status: string;
+  juros: number;
+  desconto: number;
+}
 
 interface ContaReceber {
   id: number;
@@ -16,6 +30,8 @@ interface ContaReceber {
   desconto: number;
   status: string;
   observacoes: string;
+  tipo_parcelamento?: string;
+  quantidade_parcelas?: number;
 }
 
 export function ContasReceberList() {
@@ -26,6 +42,10 @@ export function ContasReceberList() {
   const [editingConta, setEditingConta] = useState<ContaReceber | null>(null);
   const [isBaixaModalOpen, setIsBaixaModalOpen] = useState(false);
   const [contaBaixar, setContaBaixar] = useState<ContaReceber | null>(null);
+  const [isParcelamentoFormOpen, setIsParcelamentoFormOpen] = useState(false);
+  const [expandedContaId, setExpandedContaId] = useState<number | null>(null);
+  const [parcelas, setParcelas] = useState<Record<number, Parcela[]>>({});
+  const [loadingParcelas, setLoadingParcelas] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     loadContas();
@@ -73,6 +93,48 @@ export function ContasReceberList() {
     loadContas();
   };
 
+  const toggleExpandConta = async (contaId: number) => {
+    if (expandedContaId === contaId) {
+      setExpandedContaId(null);
+    } else {
+      setExpandedContaId(contaId);
+      if (!parcelas[contaId]) {
+        await loadParcelas(contaId);
+      }
+    }
+  };
+
+  const loadParcelas = async (contaId: number) => {
+    setLoadingParcelas(prev => ({ ...prev, [contaId]: true }));
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await axios.get(
+        `http://localhost:8000/financeiro/contas-receber/${contaId}/parcelas`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setParcelas(prev => ({ ...prev, [contaId]: response.data }));
+    } catch (error) {
+      console.error('Erro ao carregar parcelas:', error);
+    } finally {
+      setLoadingParcelas(prev => ({ ...prev, [contaId]: false }));
+    }
+  };
+
+  const handleBaixarParcela = (parcelaId: number) => {
+    const contaId = expandedContaId;
+    if (!contaId) return;
+    
+    const conta = contas.find(c => c.id === contaId);
+    if (conta) {
+      setContaBaixar({ ...conta, id: parcelaId });
+      setIsBaixaModalOpen(true);
+    }
+  };
+
+  const handleReagendarParcela = async (parcelaId: number, novaData: string) => {
+    await loadParcelas(expandedContaId!);
+  };
+
   const filteredContas = contas.filter(c =>
     c.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.cliente_nome && c.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -111,13 +173,22 @@ export function ContasReceberList() {
             <h1 className="text-2xl font-bold text-gray-900">Contas a Receber</h1>
             <p className="text-gray-500 mt-1">Gerencie os recebimentos</p>
           </div>
-          <button 
-            onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            <Plus size={20} />
-            Nova Conta a Receber
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setIsParcelamentoFormOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              <Layers size={20} />
+              Novo Parcelamento
+            </button>
+            <button 
+              onClick={() => setIsFormOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              <Plus size={20} />
+              Nova Conta a Receber
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-4">
@@ -153,57 +224,102 @@ export function ContasReceberList() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredContas.map((conta) => (
-                  <tr key={conta.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">{conta.descricao}</div>
-                      {conta.observacoes && (
-                        <div className="text-sm text-gray-500">{conta.observacoes.substring(0, 50)}...</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{conta.cliente_nome || 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        R$ {conta.valor_original.toFixed(2)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-green-600">
-                        R$ {conta.valor_recebido.toFixed(2)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(conta.status)}`}>
-                        {getStatusLabel(conta.status)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        {conta.status !== 'pago' && (
+                  <>
+                    <tr key={conta.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {conta.tipo_parcelamento === 'parcelado' && conta.quantidade_parcelas && conta.quantidade_parcelas > 1 && (
+                            <button
+                              onClick={() => toggleExpandConta(conta.id)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              {expandedContaId === conta.id ? (
+                                <ChevronUp size={16} />
+                              ) : (
+                                <ChevronDown size={16} />
+                              )}
+                            </button>
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {conta.descricao}
+                              {conta.tipo_parcelamento === 'parcelado' && conta.quantidade_parcelas && (
+                                <span className="ml-2 text-xs text-purple-600">
+                                  ({conta.quantidade_parcelas}x)
+                                </span>
+                              )}
+                            </div>
+                            {conta.observacoes && (
+                              <div className="text-sm text-gray-500">{conta.observacoes.substring(0, 50)}...</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{conta.cliente_nome || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          R$ {conta.valor_original.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-green-600">
+                          R$ {conta.valor_recebido.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(conta.status)}`}>
+                          {getStatusLabel(conta.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end gap-2">
+                          {conta.status !== 'pago' && (
+                            <button 
+                              onClick={() => handleBaixar(conta)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Baixar conta"
+                            >
+                              <DollarSign size={18} />
+                            </button>
+                          )}
                           <button 
-                            onClick={() => handleBaixar(conta)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Baixar conta"
+                            onClick={() => handleEdit(conta)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Editar conta"
                           >
-                            <DollarSign size={18} />
+                            <Edit size={18} />
                           </button>
-                        )}
-                        <button 
-                          onClick={() => handleEdit(conta)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Editar conta"
-                        >
-                          <Edit size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedContaId === conta.id && (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-4 bg-gray-50">
+                          {loadingParcelas[conta.id] ? (
+                            <div className="text-center text-gray-500">Carregando parcelas...</div>
+                          ) : parcelas[conta.id] ? (
+                            <ParcelasTable
+                              contaId={conta.id}
+                              tipo="receber"
+                              parcelas={parcelas[conta.id]}
+                              onBaixarParcela={handleBaixarParcela}
+                              onReagendarParcela={handleReagendarParcela}
+                              onRefresh={() => loadParcelas(conta.id)}
+                            />
+                          ) : (
+                            <div className="text-center text-gray-500">Nenhuma parcela encontrada</div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -223,6 +339,13 @@ export function ContasReceberList() {
         onClose={handleBaixaModalClose}
         onSuccess={handleBaixaSuccess}
         conta={contaBaixar}
+      />
+
+      <ParcelamentoForm
+        isOpen={isParcelamentoFormOpen}
+        onClose={() => setIsParcelamentoFormOpen(false)}
+        onSuccess={handleFormSuccess}
+        tipo="receber"
       />
     </MainLayout>
   );
