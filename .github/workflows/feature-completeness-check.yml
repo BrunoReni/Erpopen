@@ -1,0 +1,138 @@
+name: Feature Completeness Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'backend/app/feature_flags.py'
+
+jobs:
+  check-feature-completeness:
+    runs-on: ubuntu-latest
+    name: Check Feature Completeness
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -q -r requirements.txt
+          
+      - name: Check for backend-only features (Critical Gaps)
+        id: check_gaps
+        run: |
+          cd backend
+          python << 'EOF'
+          import sys
+          from app.feature_flags import get_backend_only_features, get_features_statistics
+          
+          backend_only = get_backend_only_features()
+          stats = get_features_statistics()
+          
+          print(f"📊 Feature Completeness Report")
+          print(f"=" * 50)
+          print(f"Total Features: {stats['total']}")
+          print(f"Complete: {stats['complete']} ({stats['completion_rate']:.1f}%)")
+          print(f"Incomplete: {stats['incomplete']}")
+          print(f"Backend Only (Critical): {stats['backend_only']}")
+          print(f"Partial: {stats['partial']}")
+          print(f"Average Completeness: {stats['average_completeness']:.1f}%")
+          print(f"=" * 50)
+          
+          if backend_only:
+              print(f"\n❌ CRITICAL: {len(backend_only)} feature(s) with ONLY backend implementation:")
+              for feature in backend_only:
+                  print(f"\n  🔴 {feature.name} ({feature.module})")
+                  print(f"     ID: {feature.id}")
+                  print(f"     Description: {feature.description}")
+                  if feature.issue_number:
+                      print(f"     Issue: #{feature.issue_number}")
+                  print(f"     Endpoints: {', '.join(feature.backend_endpoints[:3])}")
+                  print(f"     ⚠️  Missing: Frontend implementation")
+              
+              print(f"\n⚠️  WARNING: These features are inaccessible to users!")
+              print(f"Please implement frontend components before merging.")
+              
+              # Save for PR comment
+              with open('/tmp/gaps_report.txt', 'w') as f:
+                  f.write(f"## ⚠️ Feature Completeness Warning\n\n")
+                  f.write(f"**{len(backend_only)} feature(s) have ONLY backend implementation:**\n\n")
+                  for feature in backend_only:
+                      f.write(f"### 🔴 {feature.name}\n")
+                      f.write(f"- **Module**: {feature.module}\n")
+                      f.write(f"- **Status**: Backend Only (Missing Frontend)\n")
+                      if feature.issue_number:
+                          f.write(f"- **Issue**: #{feature.issue_number}\n")
+                      f.write(f"- **Completeness**: {feature.completeness_percentage:.0f}%\n\n")
+                  f.write(f"\n⚠️ **Action Required**: Implement frontend components for these features.\n")
+              
+              # Don't fail the build, just warn
+              sys.exit(0)
+          else:
+              print(f"\n✅ All features have frontend implementation!")
+              with open('/tmp/gaps_report.txt', 'w') as f:
+                  f.write(f"## ✅ Feature Completeness Check Passed\n\n")
+                  f.write(f"All {stats['total']} features have both backend and frontend implementation.\n\n")
+                  f.write(f"- **Complete**: {stats['complete']} ({stats['completion_rate']:.1f}%)\n")
+                  f.write(f"- **Average Completeness**: {stats['average_completeness']:.1f}%\n")
+          EOF
+          
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = '';
+            try {
+              comment = fs.readFileSync('/tmp/gaps_report.txt', 'utf8');
+            } catch (error) {
+              comment = '## Feature Completeness Check\n\nUnable to generate report.';
+            }
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Feature Completeness')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+            
+      - name: Generate Summary
+        if: always()
+        run: |
+          cat /tmp/gaps_report.txt >> $GITHUB_STEP_SUMMARY
