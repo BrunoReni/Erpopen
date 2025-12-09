@@ -660,3 +660,278 @@ def test_get_extrato(client, auth_headers, db_session):
     assert len(data["movimentacoes"]) >= 2
     assert "total_entradas" in data
     assert "total_saidas" in data
+
+
+# =============================================================================
+# TESTS FOR BAIXA (PAYMENT/RECEIPT)
+# =============================================================================
+
+def test_baixar_conta_pagar(client, auth_headers, db_session):
+    """Test baixar conta a pagar"""
+    from app.models_modules import Fornecedor, StatusPagamento
+    
+    # Create conta bancaria
+    conta_bancaria = ContaBancaria(
+        nome="Banco do Brasil",
+        banco="001",
+        agencia="1234",
+        conta="12345-6",
+        saldo_inicial=5000.0,
+        saldo_atual=5000.0,
+        ativa=1
+    )
+    db_session.add(conta_bancaria)
+    
+    # Create fornecedor
+    fornecedor = Fornecedor(
+        codigo="FOR-0001",
+        nome="Fornecedor Test",
+        cnpj="12345678000190",
+        ativo=1
+    )
+    db_session.add(fornecedor)
+    db_session.commit()
+    db_session.refresh(conta_bancaria)
+    db_session.refresh(fornecedor)
+    
+    # Create conta a pagar
+    conta_pagar = ContaPagar(
+        descricao="Conta teste",
+        fornecedor_id=fornecedor.id,
+        data_vencimento=datetime.utcnow(),
+        valor_original=1000.0,
+        valor_pago=0.0,
+        juros=0.0,
+        desconto=0.0,
+        status=StatusPagamento.PENDENTE
+    )
+    db_session.add(conta_pagar)
+    db_session.commit()
+    db_session.refresh(conta_pagar)
+    
+    # Baixar conta
+    baixa_data = {
+        "valor_pago": 1000.0,
+        "juros": 50.0,
+        "desconto": 20.0,
+        "conta_bancaria_id": conta_bancaria.id,
+        "data_pagamento": datetime.utcnow().isoformat(),
+        "observacoes": "Pagamento teste"
+    }
+    
+    response = client.post(
+        f"/financeiro/contas-pagar/{conta_pagar.id}/baixar",
+        json=baixa_data,
+        headers=auth_headers
+    )
+    
+    if response.status_code != 200:
+        print("Error response:", response.text)
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valor_pago"] == 1000.0
+    assert data["juros"] == 50.0
+    assert data["desconto"] == 20.0
+    assert data["status"] == "parcial"  # Still partial because of juros
+    
+    # Verify conta bancaria saldo was updated
+    db_session.refresh(conta_bancaria)
+    assert conta_bancaria.saldo_atual == 4000.0  # 5000 - 1000
+
+
+def test_baixar_conta_pagar_total(client, auth_headers, db_session):
+    """Test baixar conta a pagar completely"""
+    from app.models_modules import Fornecedor, StatusPagamento
+    
+    # Create conta bancaria
+    conta_bancaria = ContaBancaria(
+        nome="Banco do Brasil",
+        banco="001",
+        agencia="1234",
+        conta="12345-6",
+        saldo_inicial=5000.0,
+        saldo_atual=5000.0,
+        ativa=1
+    )
+    db_session.add(conta_bancaria)
+    
+    # Create fornecedor
+    fornecedor = Fornecedor(
+        codigo="FOR-0002",
+        nome="Fornecedor Test 2",
+        cnpj="12345678000191",
+        ativo=1
+    )
+    db_session.add(fornecedor)
+    db_session.commit()
+    db_session.refresh(conta_bancaria)
+    db_session.refresh(fornecedor)
+    
+    # Create conta a pagar
+    conta_pagar = ContaPagar(
+        descricao="Conta teste 2",
+        fornecedor_id=fornecedor.id,
+        data_vencimento=datetime.utcnow(),
+        valor_original=1000.0,
+        valor_pago=0.0,
+        juros=0.0,
+        desconto=0.0,
+        status=StatusPagamento.PENDENTE
+    )
+    db_session.add(conta_pagar)
+    db_session.commit()
+    db_session.refresh(conta_pagar)
+    
+    # Baixar conta completely
+    baixa_data = {
+        "valor_pago": 1000.0,
+        "juros": 0.0,
+        "desconto": 0.0,
+        "conta_bancaria_id": conta_bancaria.id,
+        "data_pagamento": datetime.utcnow().isoformat()
+    }
+    
+    response = client.post(
+        f"/financeiro/contas-pagar/{conta_pagar.id}/baixar",
+        json=baixa_data,
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valor_pago"] == 1000.0
+    assert data["status"] == "pago"
+
+
+def test_baixar_conta_receber(client, auth_headers, db_session):
+    """Test baixar conta a receber"""
+    from app.models_modules import Cliente, StatusPagamento
+    
+    # Create conta bancaria
+    conta_bancaria = ContaBancaria(
+        nome="Banco do Brasil",
+        banco="001",
+        agencia="1234",
+        conta="12345-6",
+        saldo_inicial=1000.0,
+        saldo_atual=1000.0,
+        ativa=1
+    )
+    db_session.add(conta_bancaria)
+    
+    # Create cliente
+    cliente = Cliente(
+        codigo="CLI-0001",
+        nome="Cliente Test",
+        cpf_cnpj="12345678901",
+        ativo=1
+    )
+    db_session.add(cliente)
+    db_session.commit()
+    db_session.refresh(conta_bancaria)
+    db_session.refresh(cliente)
+    
+    # Create conta a receber
+    conta_receber = ContaReceber(
+        descricao="Venda teste",
+        cliente_id=cliente.id,
+        cliente_nome="Cliente Test",
+        data_vencimento=datetime.utcnow(),
+        valor_original=1500.0,
+        valor_recebido=0.0,
+        juros=0.0,
+        desconto=0.0,
+        status=StatusPagamento.PENDENTE
+    )
+    db_session.add(conta_receber)
+    db_session.commit()
+    db_session.refresh(conta_receber)
+    
+    # Baixar conta
+    baixa_data = {
+        "valor_recebido": 1500.0,
+        "juros": 75.0,
+        "desconto": 50.0,
+        "conta_bancaria_id": conta_bancaria.id,
+        "data_recebimento": datetime.utcnow().isoformat(),
+        "observacoes": "Recebimento teste"
+    }
+    
+    response = client.post(
+        f"/financeiro/contas-receber/{conta_receber.id}/baixar",
+        json=baixa_data,
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valor_recebido"] == 1500.0
+    assert data["juros"] == 75.0
+    assert data["desconto"] == 50.0
+    
+    # Verify conta bancaria saldo was updated
+    db_session.refresh(conta_bancaria)
+    assert conta_bancaria.saldo_atual == 2500.0  # 1000 + 1500
+
+
+def test_baixar_conta_pagar_saldo_insuficiente(client, auth_headers, db_session):
+    """Test baixar conta a pagar with insufficient balance"""
+    from app.models_modules import Fornecedor, StatusPagamento
+    
+    # Create conta bancaria with low balance
+    conta_bancaria = ContaBancaria(
+        nome="Banco do Brasil",
+        banco="001",
+        agencia="1234",
+        conta="12345-6",
+        saldo_inicial=100.0,
+        saldo_atual=100.0,
+        ativa=1
+    )
+    db_session.add(conta_bancaria)
+    
+    # Create fornecedor
+    fornecedor = Fornecedor(
+        codigo="FOR-0003",
+        nome="Fornecedor Test 3",
+        cnpj="12345678000192",
+        ativo=1
+    )
+    db_session.add(fornecedor)
+    db_session.commit()
+    db_session.refresh(conta_bancaria)
+    db_session.refresh(fornecedor)
+    
+    # Create conta a pagar
+    conta_pagar = ContaPagar(
+        descricao="Conta teste 3",
+        fornecedor_id=fornecedor.id,
+        data_vencimento=datetime.utcnow(),
+        valor_original=1000.0,
+        valor_pago=0.0,
+        juros=0.0,
+        desconto=0.0,
+        status=StatusPagamento.PENDENTE
+    )
+    db_session.add(conta_pagar)
+    db_session.commit()
+    db_session.refresh(conta_pagar)
+    
+    # Try to baixar with insufficient balance
+    baixa_data = {
+        "valor_pago": 1000.0,
+        "juros": 0.0,
+        "desconto": 0.0,
+        "conta_bancaria_id": conta_bancaria.id,
+        "data_pagamento": datetime.utcnow().isoformat()
+    }
+    
+    response = client.post(
+        f"/financeiro/contas-pagar/{conta_pagar.id}/baixar",
+        json=baixa_data,
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 400
+    assert "insuficiente" in response.json()["detail"].lower()

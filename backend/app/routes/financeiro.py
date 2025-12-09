@@ -10,11 +10,13 @@ from app.schemas_modules import (
     ContaPagarCreate, ContaPagarRead, ContaPagarUpdate,
     ContaReceberCreate, ContaReceberRead, ContaReceberUpdate,
     MovimentacaoBancariaCreate, MovimentacaoBancariaRead, MovimentacaoBancariaUpdate,
-    SaldoDiarioRead, TransferenciaCreate
+    SaldoDiarioRead, TransferenciaCreate,
+    BaixaContaPagar, BaixaContaReceber
 )
 from app.models_modules import (
     ContaBancaria, CentroCusto, ContaPagar, ContaReceber,
-    MovimentacaoBancaria, SaldoDiario, TipoMovimentacaoBancaria
+    MovimentacaoBancaria, SaldoDiario, TipoMovimentacaoBancaria,
+    StatusPagamento
 )
 
 router = APIRouter()
@@ -314,6 +316,110 @@ def update_conta_pagar(
     return conta
 
 
+@router.post("/contas-pagar/{conta_id}/baixar", response_model=ContaPagarRead)
+def baixar_conta_pagar(
+    conta_id: int,
+    baixa: BaixaContaPagar,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """
+    Realizar baixa (pagamento) de uma conta a pagar
+    - Atualiza valor pago, juros e desconto
+    - Atualiza status da conta (pendente/parcial/pago)
+    - Cria movimentação bancária automática (débito)
+    - Atualiza saldo da conta bancária
+    """
+    # Buscar conta a pagar
+    conta = session.query(ContaPagar).filter(ContaPagar.id == conta_id).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
+    
+    # Buscar conta bancária
+    conta_bancaria = session.query(ContaBancaria).filter(
+        ContaBancaria.id == baixa.conta_bancaria_id
+    ).first()
+    if not conta_bancaria:
+        raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
+    
+    # Validar valor pago
+    if baixa.valor_pago <= 0:
+        raise HTTPException(status_code=400, detail="Valor pago deve ser maior que zero")
+    
+    # Calcular saldo devedor atual
+    saldo_devedor = conta.valor_original + conta.juros - conta.desconto - conta.valor_pago
+    
+    # Validar se o valor pago não excede o saldo devedor
+    if baixa.valor_pago > saldo_devedor:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Valor pago (R$ {baixa.valor_pago:.2f}) não pode ser maior que o saldo devedor (R$ {saldo_devedor:.2f})"
+        )
+    
+    # Verificar saldo suficiente na conta bancária
+    if conta_bancaria.saldo_atual < baixa.valor_pago:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Saldo insuficiente na conta bancária. Saldo atual: R$ {conta_bancaria.saldo_atual:.2f}"
+        )
+    
+    try:
+        # Atualizar conta a pagar
+        conta.valor_pago += baixa.valor_pago
+        conta.juros += baixa.juros
+        conta.desconto += baixa.desconto
+        
+        # Definir data de pagamento
+        data_pagamento = baixa.data_pagamento or datetime.utcnow()
+        if not conta.data_pagamento:
+            conta.data_pagamento = data_pagamento
+        
+        # Atualizar observações se fornecidas
+        if baixa.observacoes:
+            if conta.observacoes:
+                conta.observacoes = f"{conta.observacoes}\n{baixa.observacoes}"
+            else:
+                conta.observacoes = baixa.observacoes
+        
+        # Atualizar status
+        novo_saldo_devedor = conta.valor_original + conta.juros - conta.desconto - conta.valor_pago
+        if novo_saldo_devedor <= 0.01:  # Tolerância de 1 centavo
+            conta.status = StatusPagamento.PAGO
+        elif conta.valor_pago > 0:
+            conta.status = StatusPagamento.PARCIAL
+        
+        # Criar movimentação bancária (débito)
+        descricao_mov = f"Pagamento: {conta.descricao}"
+        if baixa.juros > 0:
+            descricao_mov += f" (Juros: R$ {baixa.juros:.2f})"
+        if baixa.desconto > 0:
+            descricao_mov += f" (Desconto: R$ {baixa.desconto:.2f})"
+        
+        movimentacao = MovimentacaoBancaria(
+            conta_bancaria_id=baixa.conta_bancaria_id,
+            tipo=TipoMovimentacaoBancaria.OUTROS,
+            natureza="SAIDA",
+            data_movimentacao=data_pagamento,
+            data_competencia=data_pagamento.date() if data_pagamento else datetime.utcnow().date(),
+            valor=baixa.valor_pago,
+            descricao=descricao_mov,
+            conciliado=False
+        )
+        session.add(movimentacao)
+        
+        # Atualizar saldo da conta bancária
+        conta_bancaria.saldo_atual -= baixa.valor_pago
+        
+        session.commit()
+        session.refresh(conta)
+        
+        return conta
+        
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao realizar baixa: {str(e)}")
+
+
 # =============================================================================
 # CONTAS A RECEBER
 # =============================================================================
@@ -373,6 +479,103 @@ def update_conta_receber(
     session.commit()
     session.refresh(conta)
     return conta
+
+
+@router.post("/contas-receber/{conta_id}/baixar", response_model=ContaReceberRead)
+def baixar_conta_receber(
+    conta_id: int,
+    baixa: BaixaContaReceber,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("financeiro:create"))
+):
+    """
+    Realizar baixa (recebimento) de uma conta a receber
+    - Atualiza valor recebido, juros e desconto
+    - Atualiza status da conta (pendente/parcial/pago)
+    - Cria movimentação bancária automática (crédito)
+    - Atualiza saldo da conta bancária
+    """
+    # Buscar conta a receber
+    conta = session.query(ContaReceber).filter(ContaReceber.id == conta_id).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
+    
+    # Buscar conta bancária
+    conta_bancaria = session.query(ContaBancaria).filter(
+        ContaBancaria.id == baixa.conta_bancaria_id
+    ).first()
+    if not conta_bancaria:
+        raise HTTPException(status_code=404, detail="Conta bancária não encontrada")
+    
+    # Validar valor recebido
+    if baixa.valor_recebido <= 0:
+        raise HTTPException(status_code=400, detail="Valor recebido deve ser maior que zero")
+    
+    # Calcular saldo a receber atual
+    saldo_receber = conta.valor_original + conta.juros - conta.desconto - conta.valor_recebido
+    
+    # Validar se o valor recebido não excede o saldo a receber
+    if baixa.valor_recebido > saldo_receber:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Valor recebido (R$ {baixa.valor_recebido:.2f}) não pode ser maior que o saldo a receber (R$ {saldo_receber:.2f})"
+        )
+    
+    try:
+        # Atualizar conta a receber
+        conta.valor_recebido += baixa.valor_recebido
+        conta.juros += baixa.juros
+        conta.desconto += baixa.desconto
+        
+        # Definir data de recebimento
+        data_recebimento = baixa.data_recebimento or datetime.utcnow()
+        if not conta.data_recebimento:
+            conta.data_recebimento = data_recebimento
+        
+        # Atualizar observações se fornecidas
+        if baixa.observacoes:
+            if conta.observacoes:
+                conta.observacoes = f"{conta.observacoes}\n{baixa.observacoes}"
+            else:
+                conta.observacoes = baixa.observacoes
+        
+        # Atualizar status
+        novo_saldo_receber = conta.valor_original + conta.juros - conta.desconto - conta.valor_recebido
+        if novo_saldo_receber <= 0.01:  # Tolerância de 1 centavo
+            conta.status = StatusPagamento.PAGO
+        elif conta.valor_recebido > 0:
+            conta.status = StatusPagamento.PARCIAL
+        
+        # Criar movimentação bancária (crédito)
+        descricao_mov = f"Recebimento: {conta.descricao}"
+        if baixa.juros > 0:
+            descricao_mov += f" (Juros: R$ {baixa.juros:.2f})"
+        if baixa.desconto > 0:
+            descricao_mov += f" (Desconto: R$ {baixa.desconto:.2f})"
+        
+        movimentacao = MovimentacaoBancaria(
+            conta_bancaria_id=baixa.conta_bancaria_id,
+            tipo=TipoMovimentacaoBancaria.DEPOSITO,
+            natureza="ENTRADA",
+            data_movimentacao=data_recebimento,
+            data_competencia=data_recebimento.date() if data_recebimento else datetime.utcnow().date(),
+            valor=baixa.valor_recebido,
+            descricao=descricao_mov,
+            conciliado=False
+        )
+        session.add(movimentacao)
+        
+        # Atualizar saldo da conta bancária
+        conta_bancaria.saldo_atual += baixa.valor_recebido
+        
+        session.commit()
+        session.refresh(conta)
+        
+        return conta
+        
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao realizar baixa: {str(e)}")
 
 
 @router.get("/fluxo-caixa")
