@@ -576,6 +576,100 @@ def test_desconciliar_movimentacoes(client, auth_headers, db_session):
     assert movimentacao.conciliado == False
 
 
+def test_list_pendentes_conciliacao_with_date_filter(client, auth_headers, db_session):
+    """Test date filtering for pendentes conciliacao - uses data_competencia OR data_movimentacao"""
+    from app.models_modules import MovimentacaoBancaria, TipoMovimentacaoBancaria
+    
+    conta = ContaBancaria(
+        nome="Banco do Brasil",
+        banco="001",
+        agencia="1234",
+        conta="12345-6",
+        saldo_inicial=1000.0,
+        saldo_atual=1000.0,
+        ativa=1
+    )
+    db_session.add(conta)
+    db_session.commit()
+    db_session.refresh(conta)
+    
+    # Create movimentacao WITH data_competencia inside the range (2024-01-15)
+    mov1 = MovimentacaoBancaria(
+        conta_bancaria_id=conta.id,
+        tipo=TipoMovimentacaoBancaria.DEPOSITO,
+        natureza="ENTRADA",
+        valor=100.0,
+        descricao="Com data_competencia dentro",
+        conciliado=False,
+        data_competencia=date(2024, 1, 15),
+        data_movimentacao=datetime(2024, 1, 15, 10, 0, 0)
+    )
+    
+    # Create movimentacao WITHOUT data_competencia, with data_movimentacao inside range (2024-01-18)
+    mov2 = MovimentacaoBancaria(
+        conta_bancaria_id=conta.id,
+        tipo=TipoMovimentacaoBancaria.SAQUE,
+        natureza="SAIDA",
+        valor=50.0,
+        descricao="Sem data_competencia dentro",
+        conciliado=False,
+        data_competencia=None,
+        data_movimentacao=datetime(2024, 1, 18, 14, 30, 0)
+    )
+    
+    # Create movimentacao WITH data_competencia BEFORE the range (2024-01-05)
+    mov3 = MovimentacaoBancaria(
+        conta_bancaria_id=conta.id,
+        tipo=TipoMovimentacaoBancaria.DEPOSITO,
+        natureza="ENTRADA",
+        valor=200.0,
+        descricao="Com data_competencia antes",
+        conciliado=False,
+        data_competencia=date(2024, 1, 5),
+        data_movimentacao=datetime(2024, 1, 5, 9, 0, 0)
+    )
+    
+    # Create movimentacao WITHOUT data_competencia, with data_movimentacao AFTER range (2024-01-25)
+    mov4 = MovimentacaoBancaria(
+        conta_bancaria_id=conta.id,
+        tipo=TipoMovimentacaoBancaria.SAQUE,
+        natureza="SAIDA",
+        valor=75.0,
+        descricao="Sem data_competencia depois",
+        conciliado=False,
+        data_competencia=None,
+        data_movimentacao=datetime(2024, 1, 25, 16, 0, 0)
+    )
+    
+    db_session.add_all([mov1, mov2, mov3, mov4])
+    db_session.commit()
+    
+    # Test with date filter: 2024-01-10 to 2024-01-20
+    response = client.get(
+        f"/financeiro/conciliacao/{conta.id}",
+        params={
+            "data_inicio": "2024-01-10",
+            "data_fim": "2024-01-20"
+        },
+        headers=auth_headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "movimentacoes" in data
+    
+    # Should only include mov1 (data_competencia 2024-01-15) and mov2 (data_movimentacao 2024-01-18)
+    # Should NOT include mov3 (2024-01-05 before range) and mov4 (2024-01-25 after range)
+    movimentacoes = data["movimentacoes"]
+    assert len(movimentacoes) == 2
+    
+    descricoes = [m["descricao"] for m in movimentacoes]
+    assert "Com data_competencia dentro" in descricoes
+    assert "Sem data_competencia dentro" in descricoes
+    assert "Com data_competencia antes" not in descricoes
+    assert "Sem data_competencia depois" not in descricoes
+
+
 # =============================================================================
 # TESTS FOR SALDO DIÁRIO AND EXTRATO
 # =============================================================================
