@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, and_
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.db import get_session
@@ -909,14 +910,26 @@ def listar_pendentes_conciliacao(
     if data_inicio:
         try:
             dt_inicio = datetime.strptime(data_inicio, "%Y-%m-%d").date()
-            query = query.filter(MovimentacaoBancaria.data_competencia >= dt_inicio)
+            # Usar data_competencia se não for null, senão data_movimentacao
+            query = query.filter(
+                or_(
+                    and_(MovimentacaoBancaria.data_competencia.isnot(None), MovimentacaoBancaria.data_competencia >= dt_inicio),
+                    and_(MovimentacaoBancaria.data_competencia.is_(None), func.date(MovimentacaoBancaria.data_movimentacao) >= dt_inicio)
+                )
+            )
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de data_inicio inválido. Use YYYY-MM-DD")
     
     if data_fim:
         try:
             dt_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
-            query = query.filter(MovimentacaoBancaria.data_competencia <= dt_fim)
+            # Usar data_competencia se não for null, senão data_movimentacao
+            query = query.filter(
+                or_(
+                    and_(MovimentacaoBancaria.data_competencia.isnot(None), MovimentacaoBancaria.data_competencia <= dt_fim),
+                    and_(MovimentacaoBancaria.data_competencia.is_(None), func.date(MovimentacaoBancaria.data_movimentacao) <= dt_fim)
+                )
+            )
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de data_fim inválido. Use YYYY-MM-DD")
     
