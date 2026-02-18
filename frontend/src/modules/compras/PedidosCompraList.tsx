@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Eye, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Eye, CheckCircle, XCircle, Trash2, DollarSign } from 'lucide-react';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { PedidoCompraForm } from './PedidoCompraForm';
 import api from '../../services/api';
@@ -71,6 +71,19 @@ export function PedidosCompraList() {
     } catch (error: any) {
       console.error('Erro ao aprovar pedido:', error);
       alert(error.response?.data?.detail || 'Erro ao aprovar pedido');
+    }
+  };
+
+  const handleGerarConta = async (id: number) => {
+    if (!confirm('Deseja gerar uma conta a pagar para este pedido?')) return;
+    
+    try {
+      const response = await api.post(`/compras/pedidos/${id}/gerar-conta`);
+      alert(`Conta a pagar gerada com sucesso! ID: ${response.data.conta_pagar_id}`);
+      fetchPedidos();
+    } catch (error: any) {
+      console.error('Erro ao gerar conta a pagar:', error);
+      alert(error.response?.data?.detail || 'Erro ao gerar conta a pagar');
     }
   };
 
@@ -225,6 +238,15 @@ export function PedidosCompraList() {
                                   title="Aprovar"
                                 >
                                   <CheckCircle className="w-4 h-4" />
+                                </button>
+                              )}
+                              {pedido.status === 'aprovado' && (
+                                <button
+                                  onClick={() => handleGerarConta(pedido.id)}
+                                  className="text-emerald-600 hover:text-emerald-900"
+                                  title="Gerar Conta a Pagar"
+                                >
+                                  <DollarSign className="w-4 h-4" />
                                 </button>
                               )}
                               <button
