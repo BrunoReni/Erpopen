@@ -7,8 +7,8 @@ from app.schemas_modules import (
     FornecedorCreate, FornecedorRead, FornecedorUpdate,
     PedidoCompraCreate, PedidoCompraRead, PedidoCompraUpdate
 )
-from app.models_modules import Fornecedor, PedidoCompra, ItemPedidoCompra
-from datetime import datetime
+from app.models_modules import Fornecedor, PedidoCompra, ItemPedidoCompra, ContaPagar
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -236,3 +236,71 @@ def aprovar_pedido(
     pedido.status = "aprovado"
     session.commit()
     return {"message": "Pedido aprovado com sucesso"}
+
+
+@router.post("/pedidos/{pedido_id}/gerar-conta")
+def gerar_conta_pagar(
+    pedido_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permission("compras:update"))
+):
+    """
+    Gera uma Conta a Pagar a partir de um Pedido de Compra aprovado.
+    - Valida status = APROVADO
+    - Cria Conta a Pagar vinculada ao pedido
+    - Atualiza status do pedido para RECEBIDO
+    """
+    pedido = session.query(PedidoCompra).filter(PedidoCompra.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    if pedido.status != "aprovado":
+        raise HTTPException(
+            status_code=400,
+            detail="Apenas pedidos aprovados podem gerar conta a pagar"
+        )
+
+    # Verificar se já existe conta vinculada
+    conta_existente = session.query(ContaPagar).filter(
+        ContaPagar.pedido_compra_id == pedido.id
+    ).first()
+    if conta_existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Já existe uma conta a pagar vinculada a este pedido"
+        )
+
+    try:
+        # Calcular data de vencimento (30 dias a partir de hoje)
+        data_vencimento = datetime.utcnow() + timedelta(days=30)
+
+        conta_pagar = ContaPagar(
+            descricao=f"Pedido de Compra {pedido.numero}",
+            fornecedor_id=pedido.fornecedor_id,
+            pedido_compra_id=pedido.id,
+            data_vencimento=data_vencimento,
+            valor_original=pedido.valor_total,
+            observacoes=f"Gerado automaticamente do pedido {pedido.numero}"
+        )
+        session.add(conta_pagar)
+
+        # Atualizar status do pedido
+        pedido.status = "recebido"
+        pedido.updated_at = datetime.utcnow()
+
+        session.commit()
+        session.refresh(conta_pagar)
+
+        return {
+            "message": "Conta a pagar gerada com sucesso",
+            "conta_pagar_id": conta_pagar.id,
+            "valor": conta_pagar.valor_original,
+            "vencimento": conta_pagar.data_vencimento.isoformat()
+        }
+
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar conta a pagar: {str(e)}")
