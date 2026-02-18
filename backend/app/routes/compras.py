@@ -241,6 +241,7 @@ def aprovar_pedido(
 @router.post("/pedidos/{pedido_id}/gerar-conta")
 def gerar_conta_pagar(
     pedido_id: int,
+    dias_vencimento: int = Query(30, description="Dias para vencimento da conta", ge=1, le=365),
     session: Session = Depends(get_session),
     _: bool = Depends(require_permission("compras:update"))
 ):
@@ -271,8 +272,8 @@ def gerar_conta_pagar(
         )
 
     try:
-        # Calcular data de vencimento (30 dias a partir de hoje)
-        data_vencimento = datetime.utcnow() + timedelta(days=30)
+        # Calcular data de vencimento
+        data_vencimento = datetime.utcnow() + timedelta(days=dias_vencimento)
 
         conta_pagar = ContaPagar(
             descricao=f"Pedido de Compra {pedido.numero}",
